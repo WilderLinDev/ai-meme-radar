@@ -1,5 +1,13 @@
 # Daily AI video meme digest — routine prompt
 
+Daily run:
+
+1. `git clone` or `git pull` this repo into the working directory. Run `python scripts/check_setup.py`. Do not ask about regions, platforms, watchlist accounts, or language; those are fixed (`AGENTS.md`). Ask only for a Blocked login, secret, or setting, and skip only that step. Items listed as Skipped stay skipped.
+2. Load local config from `~/.config/ai-meme-radar/` (`settings.yaml` and `.env`), or from `$AMR_CONFIG_DIR` if that is set. The copies in the repo (`config/settings.example.yaml`, `config/.env.example`) are empty templates. Do not invent account ids.
+3. Run the pipeline (`scripts/update_tracker.py`, `scripts/backtest.py`, `scripts/build_report.py`). Reports go to `reports/YYYY-MM/` with the date prefix (`YYYY-MM-DD-daily-report.md`, `YYYY-MM-DD-meme-pack.json`, `YYYY-MM-DD-cc-top100.csv`, `YYYY-MM-DD-<chart>.png`). `paths.reports_dir` and `paths.data_dir` override those folders when set.
+4. Commit and push the day's report files.
+5. Touch Lark only when `lark.enabled` is true (or this run passes `--sync-lark`). Wiki parent is `lark.wiki_parent_url`. Base app token is `lark.base_app_token`. Table ids are `lark.tables.<key>`. Doc links already imported are `lark.digest_docs`. Google Ads customer id is `google_ads.customer_id`. OAuth client id, secret, and refresh token come from the local `.env` (`GOOGLE_ADS_CLIENT_ID`, `GOOGLE_ADS_CLIENT_SECRET`, `GOOGLE_ADS_REFRESH_TOKEN`). If a value that a step requires is empty, ask for that key only and skip that step. Do not stop the rest of the run.
+
 Write in Chinese. Purpose: decide which meme to build an AI template for TODAY. As detailed as possible; length is fine. Accuracy over speed: delivery any time in the morning is fine. Priority platforms: TikTok first, then CapCut templates, then Instagram Reels; also X, YouTube Shorts, Reddit etc. as supporting sources; never Douyin. Window: last 24-48h (Monday covers the weekend). Never invent posts, links or numbers; tag each number 【已核实】/【第三方读数】/【估算】; never interpolate; show gaps and say plainly when no 30-day series exists. Three pain points to fix every run: 漏梗 (coverage), 数据口径不一 (consistency), 做不做判断不靠谱 (judgment).
 
 Efficiency rule: pull every bulk dataset ONCE at the start of the run into files, then do all meme matching and analysis from those files. Never re-pull a Top 100 list per meme. Completeness rule: capture as much data as each page shows (all dimensions, not just the ones the report uses) so it can be analysed later.
@@ -15,9 +23,7 @@ Where files go: this git repo, flat month folder `reports/YYYY-MM/`, every file 
 - `2026-11-10-watchlist-posts.csv`
 - charts directly in the same folder: `2026-11-10-heat-<slug>.png`, `2026-11-10-cc-trend-<slug>.png`
 
-No `reports/YYYY/MM/`, no per-day folder, no `charts/` subdirectory. Cumulative tracker and backtest stay in `data/`, not in the month folder.
-
-Paths such as `/workspace/lark` and `/workspace/tiktok_cc` are the old runtime locations. Scripts still read them if those directories exist, but new files are written with the names above.
+No `reports/YYYY/MM/`, no per-day folder, no `charts/` subdirectory. Cumulative tracker and backtest stay in `data/` (or `paths.data_dir`), not in the month folder.
 
 Research (organize BY MEME, never split by platform):
 
@@ -56,11 +62,11 @@ Optional inputs: `--md`, `--cc-csv`, `--remix-csv`, `--heat-json`, `--cc-trends-
 
 Save the report into this GitHub repo under `reports/YYYY-MM/` by default. Commit the markdown, the meme pack, the csv/json snapshots, and the charts. That is the delivery archive.
 
-Lark is optional and off by default (`sync_lark: false` in `config/settings.example.yaml`). Do not import the Word file to Lark Wiki and do not append rows to the Lark Base 「AI视频梗数据库」 unless this run is explicitly enabled with `--sync-lark` or `sync_lark: true` in `config/settings.yaml`.
+Lark is optional and off by default (`lark.enabled: false`). Do not import the Word file and do not append rows to the Base unless `lark.enabled` is true or this run passes `--sync-lark`.
 
 When Lark sync is enabled:
 
-- Wiki import (computerUse): open https://rlarkus1gkty4r86.usttp.larksuite.com/wiki/Myv8w0Hsfi1a4fkkE4AuBEa1tHd (Personal Hub › Work & Projects › Grok Bot), hover its tree row, import the `.docx` as a Lark doc. Create nothing else, delete nothing. If Lark login expired or import fails, say so in one line and still deliver the repo files.
-- Base append: schema and table ids are in `config/lark-base-schema.json` (base id `KakJbMCKNaHiaws7u2ZuqNfIttg`, which is the base URL identifier, not an app secret). Run `python scripts/sync_lark.py --as-of YYYY-MM-DD --sync-lark`. Pass `--existing-keys` from search_records: a list of 去重键 skips those rows; a map of 去重键 to record_id also writes update batches for 梗每日追踪, 回测, and 日报索引. Batches land in `data/lark-batches/`. Then create_records with inlined arrays (batches of ~40–80). Append the day's rows to every table: CC榜单快照 (all regions × 7/30d), CC话题曲线, CC话题受众 (age/country), 梗每日追踪, 二创视频, 回测 (update results that became judgeable), 监控账号 (状态 field; all 53 are 已选; 去重键 {平台}|{handle}), 日报索引 (去重键 date|version, date, Lark doc link, 做/观望/不做 lists, run time). Add a table if new dimensions appear (e.g. a 监控账号帖子 table for watchlist-post rows). Never duplicate dedupe keys; verify counts with search_records. If a write fails, say so in one line. No app secret is stored in this repo; the user Lark connector is the only write path.
+- Wiki import: open `lark.wiki_parent_url`, import the `.docx` as a doc under that node. Create nothing else, delete nothing. If login expired or import fails, say so in one line and still push the repo files. After a successful import, the new doc URL can be stored locally under `lark.digest_docs` as `YYYY-MM-DD|version`.
+- Base append: field layout is `config/lark-base-schema.json` (no account ids). Table ids are `lark.tables.*` and the base id is `lark.base_app_token`. Run `python scripts/sync_lark.py --as-of YYYY-MM-DD --sync-lark`. The script exits if `lark.base_app_token`, `lark.wiki_parent_url`, or a required `lark.tables.*` value is empty. Pass `--existing-keys` from search_records: a list of 去重键 skips those rows; a map of 去重键 to record_id also writes update batches for 梗每日追踪, 回测, and 日报索引. Batches land in `data/lark-batches/`. Then create_records with inlined arrays (batches of ~40–80). Append the day's rows to every table: CC榜单快照, CC话题曲线, CC话题受众, 梗每日追踪, 二创视频, 回测, 监控账号 (状态; 去重键 {平台}|{handle}), 日报索引 (去重键 date|version). Add a table if new dimensions appear. Never duplicate dedupe keys. If a write fails, say so in one line. No app secret is stored in this repo.
 
 Deliver in this chat: the top picks (做) with score, 已火天数 and 高峰状态, backtest hit rate in one line, the 不做 list in one line, the repo path of the report (and the Lark doc link only if sync was on), one line on rows added to the Base if sync was on, total run time, and 1-2 key chart images. If genuinely nothing new is trending, send a one-line note saying so and still save the files under `reports/`.

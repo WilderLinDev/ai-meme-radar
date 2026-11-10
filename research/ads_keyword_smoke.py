@@ -20,8 +20,8 @@ OUT_DIR = P.google_ads_output_dir()
 TOKEN_PATH = OUT_DIR / ".access_token"
 LOG_PATH = OUT_DIR / "run.log"
 
-CUSTOMER_ID = "7611906858"
-BASE = f"https://googleads.googleapis.com/v26/customers/{CUSTOMER_ID}"
+def _ads_base() -> str:
+    return f"https://googleads.googleapis.com/v26/customers/{P.require_google_ads_customer_id()}"
 LANG = "languageConstants/1000"
 NETWORK = "GOOGLE_SEARCH"
 
@@ -82,15 +82,8 @@ def log(msg: str) -> None:
         f.write(line + "\n")
 
 
-def load_env(path: Path) -> dict[str, str]:
-    env: dict[str, str] = {}
-    for raw in path.read_text().splitlines():
-        raw = raw.strip()
-        if not raw or raw.startswith("#") or "=" not in raw:
-            continue
-        k, v = raw.split("=", 1)
-        env[k.strip()] = v.strip().strip('"').strip("'")
-    return env
+def load_env(path: Path | None = None) -> dict[str, str]:
+    return P.google_ads_secrets()
 
 
 def get_access_token(env: dict[str, str]) -> str:
@@ -124,7 +117,7 @@ def get_access_token(env: dict[str, str]) -> str:
 
 
 def ads_post(token: str, endpoint: str, body: dict[str, Any], retries: int = 6) -> dict[str, Any]:
-    url = f"{BASE}:{endpoint}"
+    url = f"{_ads_base()}:{endpoint}"
     headers = {
         "Authorization": f"Bearer {token}",
         "Content-Type": "application/json",
@@ -154,18 +147,7 @@ def ads_post(token: str, endpoint: str, body: dict[str, Any], retries: int = 6) 
 
 def main() -> None:
     OUT_DIR.mkdir(parents=True, exist_ok=True)
-    env = load_env(ENV_PATH)
-    needed = [
-        "GOOGLE_ADS_CLIENT_ID",
-        "GOOGLE_ADS_CLIENT_SECRET",
-        "GOOGLE_ADS_REFRESH_TOKEN",
-        "GOOGLE_ADS_CUSTOMER_ID",
-    ]
-    missing = [k for k in needed if k not in env]
-    if missing:
-        raise SystemExit(f"Missing env keys: {missing}")
-    if env.get("GOOGLE_ADS_CUSTOMER_ID") and env["GOOGLE_ADS_CUSTOMER_ID"] != CUSTOMER_ID:
-        log(f"Note: env customer id differs, using {CUSTOMER_ID} as instructed")
+    env = load_env()
     token = get_access_token(env)
 
     # Small smoke test

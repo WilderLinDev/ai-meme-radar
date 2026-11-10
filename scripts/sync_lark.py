@@ -9,7 +9,7 @@ this box). This script:
   2. Writes per-table JSON batches under
      data/lark-batches/<as-of>-<table_key>.json
      already split into chunks of at most 500 records, in create_records shape
-  Lark batches are written only when --sync-lark is passed or sync_lark is true.
+  Lark batches are written only when --sync-lark is passed or lark.enabled is true.
   3. Never invents values; omits empty fields instead of sending blank strings
   4. Uses 去重键 so a rerun can skip keys already in the Base
 
@@ -21,8 +21,8 @@ MCP write rules (user-Lark-base create_records only; no app secret on this box):
     small enough to inline.
   - URL fields (详情链接, Lark链接, 主页链接, 链接) must be {link, text}
     objects. Plain strings return lark_code 1254068 URLFieldConvFail.
-  - Do not delete or rename the default table tblXzNbv84sJpzfO (Table).
-  - Include authorizedBy: ["pt23u"] on write calls.
+  - Do not delete or rename the empty default table. Its id is lark.tables.default_table.
+  - If the connector requires authorizedBy, use lark.authorized_by from local settings.
 
 After tables exist, an agent should:
   - search_records for 去重键 (page through if needed) and write
@@ -53,8 +53,6 @@ from zoneinfo import ZoneInfo
 
 import paths as P
 
-APP_TOKEN = "KakJbMCKNaHiaws7u2ZuqNfIttg"
-BASE_URL = "https://rlarkus1gkty4r86.usttp.larksuite.com/base/KakJbMCKNaHiaws7u2ZuqNfIttg"
 BASE_TZ = ZoneInfo("America/Los_Angeles")
 BATCH_DIR = P.LARK_BATCH_DIR
 SCHEMA_PATH = P.LARK_SCHEMA
@@ -829,34 +827,30 @@ def build_watchlist() -> list[dict]:
 
 
 def build_digest_index() -> list[dict]:
-    """Hard-coded only for links we actually have. Do not invent verdicts for older versions."""
-    # v5 verdicts come from the seeded tracker
+    """Rows only for doc URLs set in lark.digest_docs. Never invent links."""
     tracker = P.TRACKER
-    by_verdict = {"做": [], "观望": [], "不做": []}
+    by_date: dict[str, dict[str, list]] = {}
     if tracker.exists():
         for r in read_csv(tracker):
-            if r.get("date") == "2026-11-10" and r.get("verdict") in by_verdict:
-                by_verdict[r["verdict"]].append(r.get("meme"))
-    items = [
-        {
-            "date": "2026-11-10",
-            "version": "v5",
-            "url": "https://rlarkus1gkty4r86.usttp.larksuite.com/wiki/T9G7wtF29i3pOpkuwxdumICntCW",
-            "do": "、".join(by_verdict["做"]),
-            "watch": "、".join(by_verdict["观望"]),
-            "dont": "、".join(by_verdict["不做"]),
-            "note": "现行结构版：总排名表 + 每梗七块 + Top100 话题 + 7日/30日曲线。",
-        },
-        {
-            "date": "2026-11-10",
-            "version": "v4",
-            "url": "https://rlarkus1gkty4r86.usttp.larksuite.com/wiki/VTYkw3syziAUTZkG3tMucmmrtge",
-            "do": "",
-            "watch": "",
-            "dont": "",
-            "note": "结构被否决的上一版。当时的做/观望/不做名单没有单独保存，这里只记链接，不补结论。",
-        },
-    ]
+            day = r.get("date") or ""
+            bucket = by_date.setdefault(day, {"做": [], "观望": [], "不做": []})
+            if r.get("verdict") in bucket:
+                bucket[r["verdict"]].append(r.get("meme"))
+    items = []
+    for key, url in P.lark_digest_docs().items():
+        if not url or "|" not in key:
+            continue
+        day, version = key.split("|", 1)
+        verdicts = by_date.get(day, {"做": [], "观望": [], "不做": []})
+        items.append({
+            "date": day,
+            "version": version,
+            "url": url,
+            "do": "、".join(verdicts["做"]),
+            "watch": "、".join(verdicts["观望"]),
+            "dont": "、".join(verdicts["不做"]),
+            "note": "链接来自本地 lark.digest_docs。",
+        })
     rows = []
     for it in items:
         key = f"{it['date']}|{it['version']}"
@@ -1020,6 +1014,7 @@ def main() -> int:
     if not P.lark_enabled(args.sync_lark, args.no_lark):
         print(P.lark_disabled_message())
         return 0
+    P.require_lark_for_sync(list(BUILDERS))
     existing = load_existing_keys(Path(args.existing_keys)) if args.existing_keys else None
     write_batches(args.as_of, existing)
     return 0

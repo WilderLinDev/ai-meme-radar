@@ -1,13 +1,10 @@
 {
-  "app_token": "KakJbMCKNaHiaws7u2ZuqNfIttg",
-  "base_url": "https://rlarkus1gkty4r86.usttp.larksuite.com/base/KakJbMCKNaHiaws7u2ZuqNfIttg",
   "base_name": "AI视频梗数据库",
   "base_timezone": "America/Los_Angeles",
   "date_ms_note": "Date fields are written as milliseconds at 00:00:00 in the Base timezone (America/Los_Angeles) so the calendar day displays correctly in the Base UI. Rory's local zone is Asia/Hong_Kong / Asia/Shanghai.",
   "url_field_note": "URL fields must be objects {link, text}, not plain strings. Plain strings return lark_code 1254068 URLFieldConvFail.",
   "number_formatter_note": "Lark rejected formatter 0.000000 (1254001 WrongRequestBody). Use 0, 0.0, or 0.00.",
   "left_untouched": {
-    "table_id": "tblXzNbv84sJpzfO",
     "name": "Table",
     "reason": "The connector has no rename-table tool. The empty default table was left as-is."
   },
@@ -34,8 +31,6 @@
   "batches_dir": "data/lark-batches/",
   "tables": {
     "cc_rank_snapshot": {
-      "table_id": "tbluodxABkvcJpyZ",
-      "default_view_id": "vewIsPVaoA",
       "loaded": 200,
       "expected": 200,
       "name": "CC榜单快照",
@@ -172,8 +167,6 @@
       "verified_via": "search_records total"
     },
     "cc_hashtag_curve": {
-      "table_id": "tblGFdhKwHZ1AN4f",
-      "default_view_id": "vewSCMEIiC",
       "loaded": 511,
       "expected": 511,
       "name": "CC话题曲线",
@@ -274,8 +267,6 @@
       "verified_via": "search_records total"
     },
     "cc_hashtag_audience": {
-      "table_id": "tbl8Saaz5YCBdsnu",
-      "default_view_id": "vewE379HE0",
       "loaded": 0,
       "expected": 0,
       "name": "CC话题受众",
@@ -385,8 +376,6 @@
       "verified_via": "search_records total"
     },
     "meme_daily_tracker": {
-      "table_id": "tbl9vyV8fJUr0j7Q",
-      "default_view_id": "vewEiPk0Sy",
       "loaded": 16,
       "expected": 16,
       "name": "梗每日追踪",
@@ -684,8 +673,6 @@
       "verified_via": "search_records total"
     },
     "remix_videos": {
-      "table_id": "tblZyWjZyelhvpuz",
-      "default_view_id": "vewBVYdy2d",
       "loaded": 127,
       "expected": 127,
       "name": "二创视频",
@@ -852,8 +839,6 @@
       "verified_via": "search_records total"
     },
     "backtest": {
-      "table_id": "tblLZw7zmdAU0ZfF",
-      "default_view_id": "vewSlb7sp6",
       "loaded": 5,
       "expected": 5,
       "name": "回测",
@@ -973,8 +958,6 @@
       "verified_via": "search_records total"
     },
     "watchlist": {
-      "table_id": "tbl1XsGgnaqm37Ho",
-      "default_view_id": "vewFlGKtDC",
       "loaded": 28,
       "expected": 28,
       "name": "监控账号",
@@ -1153,8 +1136,6 @@
       "verified_via": "search_records total"
     },
     "digest_index": {
-      "table_id": "tblMh1esdmot41QV",
-      "default_view_id": "vewfb2GGQM",
       "loaded": 2,
       "expected": 2,
       "name": "日报索引",
@@ -1215,14 +1196,14 @@
     "cc_rank_snapshot": "200/200, compact s01–s05 all loaded",
     "meme_daily_tracker": "16/16",
     "backtest": "5/5, all 结果=数据不足 (D+3=2026-11-13 still ahead)",
-    "digest_index": "2/2 (2026-11-10 v5 wiki T9G7wtF29i3pOpkuwxdumICntCW with 做/观望/不做 from tracker; v4 wiki VTYkw3syziAUTZkG3tMucmmrtge, link only, verdicts left blank)",
+    "digest_index": "Doc URLs are not stored here. Set lark.digest_docs in local settings.",
     "cc_hashtag_audience": "0/0 empty by design until future CC detail captures",
     "cc_hashtag_curve": "511/511 (11 from part02.s01 + 500 from upload/curve_01.json–curve_05.json, 100 rows per create_records call; already-loaded 去重键 skipped)",
     "remix_videos": "127/127 (7 from s04 + 40×3 from upload/remix_01.json–remix_03.json)",
     "watchlist": "28/28 (upload watchlist splits, 14+14)"
   },
   "source_coverage_notes": [
-    "Only one top100 file exists on disk: /workspace/tiktok_cc/2026-11-10_US_NewsEnt_top100.csv (200 rows, 7d+30d). No 11/02–11/09 ranking snapshots, so 排名变化 is empty.",
+    "Only one top100 file exists on disk: 2026-11-10_US_NewsEnt_top100.csv (200 rows, 7d+30d). No 11/02–11/09 ranking snapshots, so 排名变化 is empty.",
     "cc_hashtag_trends_2026-11-10.csv contributed 511 found curve points; 10 not-found rows were skipped.",
     "详情ID/详情链接 filled only when known from cc_tag_ids_2026-11-10.json or trend CSV URLs; not invented.",
     "No 11/02–11/09 digest packs on disk. Tracker and backtest are seeded from the 11/10 pack only.",

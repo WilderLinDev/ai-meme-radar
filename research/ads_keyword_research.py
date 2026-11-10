@@ -29,8 +29,8 @@ def _ensure_out() -> None:
     OUT.mkdir(parents=True, exist_ok=True)
     RAW_DIR.mkdir(parents=True, exist_ok=True)
 
-CUSTOMER_ID = "7611906858"
-BASE = f"https://googleads.googleapis.com/v26/customers/{CUSTOMER_ID}"
+def _ads_base() -> str:
+    return f"https://googleads.googleapis.com/v26/customers/{P.require_google_ads_customer_id()}"
 LANG = "languageConstants/1000"
 NETWORK = "GOOGLE_SEARCH"
 
@@ -185,14 +185,7 @@ def log(msg: str) -> None:
 
 
 def load_env() -> dict[str, str]:
-    env: dict[str, str] = {}
-    for raw in ENV_PATH.read_text().splitlines():
-        raw = raw.strip()
-        if not raw or raw.startswith("#") or "=" not in raw:
-            continue
-        k, v = raw.split("=", 1)
-        env[k.strip()] = v.strip().strip('"').strip("'")
-    return env
+    return P.google_ads_secrets()
 
 
 def get_access_token(force: bool = False) -> str:
@@ -229,7 +222,7 @@ def get_access_token(force: bool = False) -> str:
 
 
 def ads_post(endpoint: str, body: dict[str, Any], retries: int = 8) -> dict[str, Any]:
-    url = f"{BASE}:{endpoint}"
+    url = f"{_ads_base()}:{endpoint}"
     token = get_access_token()
     last = None
     for attempt in range(1, retries + 1):

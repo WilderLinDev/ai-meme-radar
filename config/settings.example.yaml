@@ -1,12 +1,39 @@
-# 复制为 config/settings.yaml 后再改。settings.yaml 不入库。
-# 默认不写 Lark。日报放在 reports/YYYY-MM/。
-sync_lark: false
+# Copy to ~/.config/ai-meme-radar/settings.yaml (override the folder with AMR_CONFIG_DIR).
+# Leave this example empty. Do not commit real account ids.
+
+lark:
+  # Master switch. The pipeline still writes reports/ when this is false.
+  enabled: false
+  # Base app_token, the id in the Base URL. Not an OAuth secret.
+  base_app_token: ""
+  # Full Base URL. Optional. Used when you want the link stored with batches.
+  base_url: ""
+  # Wiki node under which the day's Word file is imported.
+  wiki_parent_url: ""
+  # Lark user id for authorizedBy, only if the connector requires it.
+  authorized_by: ""
+  # table key -> Lark table_id. Empty until you create or look up the tables.
+  tables:
+    cc_rank_snapshot: ""
+    cc_hashtag_curve: ""
+    cc_hashtag_audience: ""
+    meme_daily_tracker: ""
+    remix_videos: ""
+    backtest: ""
+    watchlist: ""
+    digest_index: ""
+    default_table: ""
+  # "YYYY-MM-DD|version" -> doc URL. Empty means no digest-index links are written.
+  digest_docs: {}
 
 google_ads:
-  # 留空时依次看 $GOOGLE_ADS_ENV_FILE、/home/box/.secrets/google_ads.env、~/.secrets/google_ads.env。
-  # 那个文件不要放进仓库。字段见仓库根目录的 .env.example。
-  env_file: ""
+  # Ads account customer id (digits). Not an OAuth secret.
+  # Override with GOOGLE_ADS_CUSTOMER_ID.
+  customer_id: ""
 
 paths:
-  # 留空即使用仓库里的 scripts/reportlib。只有要换一份实现时才填目录。
+  # Empty means <repo>/data, <repo>/reports, <repo>/scripts, and the bundled font path.
+  data_dir: ""
+  reports_dir: ""
   reportlib: ""
+  font: ""

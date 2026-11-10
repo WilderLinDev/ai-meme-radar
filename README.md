@@ -45,7 +45,7 @@ data/                         累计追踪表和回测
 
 累计文件在 `data/meme-daily-tracker.csv`、`data/backtest-latest.json`、`data/backtest-latest.csv`。
 
-`/workspace/lark`、`/workspace/tiktok_cc`、`/home/box/.secrets/google_ads.env` 是原来那台机器上的绝对路径。脚本还会在这些路径存在时读它们。新的默认路径都相对本仓库。
+路径默认相对本仓库：`data/`、`reports/YYYY-MM/`。要用别的目录，在本地 settings 里填 `paths.data_dir` 和 `paths.reports_dir`。
 
 ## 怎么跑
 
@@ -121,10 +121,14 @@ python research/ads_keyword_smoke.py
 python research/ads_keyword_research.py
 ```
 
-输出在 `research/output/`，不入库。环境文件路径依次是 `$GOOGLE_ADS_ENV_FILE`、`config/settings.yaml` 里的 `google_ads.env_file`、`/home/box/.secrets/google_ads.env`、`~/.secrets/google_ads.env`。
+输出在 `research/output/`，不入库。
 
-## 凭证
+每天开跑先执行 `python scripts/check_setup.py`。范围（地区、平台、监控号、语言）已经写死，不要再问。脚本只把挡住某一步的缺口列在 Blocked；Skipped 是可选项，记一笔就继续。规则见 `AGENTS.md`。
 
-Google Ads OAuth 和 Lark 登录凭证都不放进仓库。根目录 `.env.example` 只有四个空字段：`GOOGLE_ADS_CLIENT_ID`、`GOOGLE_ADS_CLIENT_SECRET`、`GOOGLE_ADS_REFRESH_TOKEN`、`GOOGLE_ADS_CUSTOMER_ID`。把填好的文件放在上面的 secrets 路径，不要提交。
+## 配置与密钥
 
-`config/lark-base-schema.json` 里的 Base id 是多维表格 URL 上的标识，不是密钥。Keyword Planner 脚本里写死的 customer id 是查询使用的账号编号，不是 OAuth 密钥。
+仓库里的 `config/settings.example.yaml` 和 `config/.env.example` 全是空值。真实配置放在本机 `~/.config/ai-meme-radar/`（`settings.yaml` 和 `.env`），用环境变量 `AMR_CONFIG_DIR` 可以改这个目录。不要把这两个文件提交进来。
+
+读取顺序：示例默认值，然后本地 `settings.yaml`，然后环境变量。密钥只从本地 `.env` 和环境变量读，不从 yaml 读。
+
+Lark 默认关闭（`lark.enabled: false`）。打开同步时如果 `lark.base_app_token`、`lark.wiki_parent_url` 或 `lark.tables.*` 还是空的，脚本会直接退出并指出缺哪一项。Google Ads 的 customer id 在 `google_ads.customer_id`，OAuth 三项在 `.env`。

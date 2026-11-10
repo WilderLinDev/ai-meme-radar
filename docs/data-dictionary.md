@@ -40,7 +40,7 @@ Creative Center 的值是窗口内各自归一化的相对指数 0–100。7 日
 
 `config/watchlist.csv` 是 53 个已选监控号。主要列：rank, platform, handle, profile_url, type, display_name, followers, followers_as_of, followers_tag, video_count, language, region, why, selected, selected_on。
 
-`config/lark-base-schema.json` 是「AI视频梗数据库」的表、字段和去重键。Base 的 app token 是多维表格在 URL 里的标识，不是登录密钥。
+`config/lark-base-schema.json` 只保留表、字段和去重键。Base app token、表 id、Wiki 链接都在本地 `lark.*` 设置里，不写进仓库。
 
 表：
 
@@ -59,4 +59,4 @@ URL 字段必须是 `{link, text}`，不能是纯字符串。日期写成 Base �
 
 ## 旧路径
 
-`/workspace/lark`、`/workspace/tiktok_cc`、`/home/box/.secrets/google_ads.env` 是原来那台机器上的运行路径。脚本在这些路径上还能读到文件，但新的默认位置是本仓库里的相对路径。
+数据目录默认是仓库里的 `data/` 和 `reports/`。本地 `paths.data_dir`、`paths.reports_dir` 可以改成别的路径。账号和密钥放在 `~/.config/ai-meme-radar/`。
