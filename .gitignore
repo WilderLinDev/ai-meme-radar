@@ -1,0 +1,18 @@
+.env
+*.env
+.secrets/
+
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# 本地覆盖。示例文件 settings.example.yaml 要入库。
+config/settings.yaml
+
+# Google Ads 运行产物和访问令牌缓存
+research/output/
+*.access_token
+
+# Lark 批次是同步开启时的中间文件
+data/lark-batches/

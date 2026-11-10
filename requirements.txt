@@ -1,0 +1,4 @@
+python-docx
+requests
+# 图表在 reportlib 里用 matplotlib 绘制。reportlib 不在本仓库，装上后把目录写进 config/settings.yaml 的 paths.reportlib。
+matplotlib

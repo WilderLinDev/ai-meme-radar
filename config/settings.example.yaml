@@ -1,0 +1,12 @@
+# 复制为 config/settings.yaml 后再改。settings.yaml 不入库。
+# 默认不写 Lark。日报放在 reports/YYYY-MM/。
+sync_lark: false
+
+google_ads:
+  # 留空时依次看 $GOOGLE_ADS_ENV_FILE、/home/box/.secrets/google_ads.env、~/.secrets/google_ads.env。
+  # 那个文件不要放进仓库。字段见仓库根目录的 .env.example。
+  env_file: ""
+
+paths:
+  # reportlib 包所在目录（图表和 docx 主题）。留空则在 /workspace/lark 存在时使用它。
+  reportlib: ""
