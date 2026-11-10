@@ -36,11 +36,17 @@ BUCKET_COLORS = {
 
 
 def setup_font(font_path: str):
-    font_manager.fontManager.addfont(font_path)
-    prop = font_manager.FontProperties(fname=font_path)
-    name = prop.get_name()
+    path = Path(font_path) if font_path else None
+    if path and path.is_file():
+        font_manager.fontManager.addfont(str(path))
+        prop = font_manager.FontProperties(fname=str(path))
+        family = prop.get_name()
+    else:
+        prop = font_manager.FontProperties(family="DejaVu Sans")
+        family = "DejaVu Sans"
+        print(f"FONT missing ({font_path}); charts use {family}. Chinese labels may not render.")
     plt.rcParams.update({
-        "font.family": name,
+        "font.family": family,
         "font.size": 12,
         "axes.unicode_minus": False,
         "figure.facecolor": BG,

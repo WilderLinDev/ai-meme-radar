@@ -2,6 +2,15 @@
 
 Daily overseas AI-meme video radar. TikTok first, then CapCut, then Instagram Reels.
 
+先读 `AGENTS.md`。每天第一步：
+
+```bash
+pip install -r requirements.txt
+python scripts/check_setup.py
+```
+
+没有 Lark、没有 Google Ads 也能写出 `reports/YYYY-MM/YYYY-MM-DD-daily-report.md` 和 `.docx`。地区、平台、53 个公开监控号是仓库里的默认范围，不要再问。只在某一步缺登录或密钥时才问，并说明缺了会跳过哪一步。
+
 每个工作日早上，判断今天该不该做一个海外 AI 视频梗模板。平台顺序是 TikTok、CapCut 模板、Instagram Reels，X 发帖数、ViralRemix、Know Your Meme 等作辅证，不看抖音。TikTok Creative Center 拉 8 个地区（US、GB、AU、CA、DE、JP、KR、FR）× 7 日和 30 日的 News & Entertainment Top 100。监控名单 53 个账号（`config/watchlist.csv`）。
 
 评分满分 100，五项各 20：热度、趋势、分享率、竞争、窗口。结论是做、观望或不做。做的推荐在 D+3 回测。Word 日报默认写进本仓库的 `reports/YYYY-MM/`。Lark Wiki 导入和 Lark Base「AI视频梗数据库」追加默认关闭，只有显式打开时才做。
@@ -123,12 +132,20 @@ python research/ads_keyword_research.py
 
 输出在 `research/output/`，不入库。
 
-每天开跑先执行 `python scripts/check_setup.py`。范围（地区、平台、监控号、语言）已经写死，不要再问。脚本只把挡住某一步的缺口列在 Blocked；Skipped 是可选项，记一笔就继续。规则见 `AGENTS.md`。
-
 ## 配置与密钥
 
 仓库里的 `config/settings.example.yaml` 和 `config/.env.example` 全是空值。真实配置放在本机 `~/.config/ai-meme-radar/`（`settings.yaml` 和 `.env`），用环境变量 `AMR_CONFIG_DIR` 可以改这个目录。不要把这两个文件提交进来。
 
 读取顺序：示例默认值，然后本地 `settings.yaml`，然后环境变量。密钥只从本地 `.env` 和环境变量读，不从 yaml 读。
 
-Lark 默认关闭（`lark.enabled: false`）。打开同步时如果 `lark.base_app_token`、`lark.wiki_parent_url` 或 `lark.tables.*` 还是空的，脚本会直接退出并指出缺哪一项。Google Ads 的 customer id 在 `google_ads.customer_id`，OAuth 三项在 `.env`。
+Lark 默认关闭（`lark.enabled: false`）。打开同步时如果 `lark.base_app_token`、`lark.wiki_parent_url` 或 `lark.tables.*` 还是空的，脚本会直接退出并指出缺哪一项。Google Ads 的 customer id 在 `google_ads.customer_id`，OAuth 三项在 `.env`。许可证是 MIT（`LICENSE`，Copyright 2026 WilderLinDev）。
+
+## English
+
+Public AI-meme radar for overseas short video. Default scope is already in the repo: TikTok, then CapCut, then Instagram Reels; Creative Center regions US, GB, AU, CA, DE, JP, KR, FR (skip NL); 53 public accounts in `config/watchlist.csv`. Reports are Chinese. Do not ask to change that scope.
+
+Quick start: `pip install -r requirements.txt`, then `python scripts/check_setup.py`, then follow `AGENTS.md` and `docs/routine-prompt.md`. Copy `config/settings.example.yaml` and `config/.env.example` to `~/.config/ai-meme-radar/` only when you have real ids. `AMR_CONFIG_DIR` overrides that folder.
+
+Setup: Lark and Google Ads are optional. With both empty, the run still writes `reports/YYYY-MM/YYYY-MM-DD-daily-report.md` and `.docx`. X post counts and a TikTok Creative Center browser login unlock the main data pulls; Instagram login, Lark, Google Ads, and `GITHUB_TOKEN` are optional and are skipped when absent. Numbers are tagged 【已核实】 / 【第三方读数】 / 【估算】 and are never invented.
+
+Structure: `scripts/` (pipeline and `reportlib/`), `config/`, `docs/`, `research/`, `reports/YYYY-MM/`, `data/`. One flat month folder, date-prefixed filenames, no extra skill directories.

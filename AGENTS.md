@@ -1,19 +1,64 @@
-# Agent rules
+# AI meme radar
 
-Scope is already decided. Do not ask the user about it.
+Daily overseas AI-meme video radar. Decide which meme is worth an AI template today. Platform order is TikTok, then CapCut templates, then Instagram Reels. Supporting sources are X, YouTube Shorts, and Reddit. Never Douyin.
 
-Use these as they are written in the repo and in `docs/routine-prompt.md`:
+This file is the entry point for any coding agent. The research procedure is `docs/routine-prompt.md`. Scoring is `docs/scoring.md`.
 
-- Platforms, in order: TikTok, then CapCut templates, then Instagram Reels. Supporting sources are X, YouTube Shorts, and Reddit. Never Douyin.
-- Creative Center: regions US, GB, AU, CA, DE, JP, KR, FR; periods 7 and 30 days; industry News & Entertainment. NL is not offered, so skip it.
-- Watchlist: every account in `config/watchlist.csv`. Do not ask which accounts to add or drop.
-- Report language: Chinese. Scoring: `docs/scoring.md`.
-- Output: `reports/YYYY-MM/` with date-prefixed filenames. Commit and push those files.
+## Repo map
 
-Do not ask the user to confirm, narrow, or expand that scope.
+- `docs/` — routine prompt, schedule, scoring, data dictionary
+- `scripts/` — tracker, backtest, report builder, Lark batch builder, `check_setup.py`
+- `scripts/reportlib/` — charts and the Word theme (`docx_report.py`)
+- `config/watchlist.csv` — default 53 public TikTok and Instagram accounts
+- `config/settings.example.yaml` and `config/.env.example` — empty templates
+- `config/lark-base-schema.json` — Base fields and dedupe keys, no account ids
+- `research/` — optional Google Ads Keyword Planner
+- `reports/YYYY-MM/` — date-prefixed daily files (`2026-11-10-daily-report.md`)
+- `data/` — cumulative tracker and backtest
+- Real ids and secrets live in `~/.config/ai-meme-radar/` (`AMR_CONFIG_DIR` overrides it)
 
-Ask only when a login, secret, or setting required for a step is missing. Name the step, the exact key or login it needs, and what you will skip without it. Then continue the rest of the run.
+## Honesty
 
-If an optional value is missing, say that part is skipped. Do not ask, and do not block the run.
+Never invent posts, links, or numbers. Tag each number 【已核实】, 【第三方读数】, or 【估算】. Do not interpolate. Leave gaps and say when a series is missing. Scores in the meme pack must add up. The report builder does not invent scores.
 
-Run `python scripts/check_setup.py` at the start of a daily run and follow its "Blocked" and "Skipped" lists. Browser logins (TikTok Creative Center, TikTok, Instagram) are not visible to that script. If one expires mid-run, ask only for that login, skip that pull, and keep going.
+## Scope is fixed
+
+Do not ask the user about regions, platforms, watchlist accounts, or language. Use the defaults as they are:
+
+- Creative Center regions: US, GB, AU, CA, DE, JP, KR, FR. Periods 7 and 30. Industry News & Entertainment. NL is not offered; skip it and say so.
+- Platforms: TikTok, then CapCut, then Instagram Reels.
+- Watchlist: every row in `config/watchlist.csv`.
+- Report language: Chinese.
+
+## Preflight
+
+Before a daily run, run:
+
+```bash
+python scripts/check_setup.py
+```
+
+Read its Present, Ask, and Skipped sections. Ask only for a login, secret, or setting that the script puts under Ask, or that a live pull then rejects. Say what that item unlocks and which step you will skip without it. Then continue. Items under Skipped are optional: note them and do not ask.
+
+## Minimum path
+
+Lark and Google Ads are optional. With neither one configured, the pipeline still writes `reports/YYYY-MM/YYYY-MM-DD-daily-report.md` and `.docx`. Charts use a fallback font if `paths.font` is missing; Chinese glyphs in charts may be missing, and the doc says so.
+
+## What each access unlocks
+
+- X API — 7-day post counts (`get_posts_counts_recent`). Not stored in this repo. If the tool is unauthorized, ask once. Without it, skip X heat points and record the gap.
+- TikTok Creative Center, browser login — 8-region Top 100 and hashtag detail pages. If the browser is logged out, ask once. Without it, skip that bulk pull and say so.
+- Instagram login — optional. Unlocks watchlist profile grids. Without it, skip Instagram rows and say so.
+- Lark (`lark.enabled`, `lark.base_app_token`, `lark.wiki_parent_url`, `lark.tables.*`) — optional Wiki import and Base append. Off by default. If enabled but a required key is empty, ask for that key and skip Lark only.
+- Google Ads (`google_ads.customer_id` plus `GOOGLE_ADS_CLIENT_ID`, `GOOGLE_ADS_CLIENT_SECRET`, `GOOGLE_ADS_REFRESH_TOKEN` in the local `.env`) — optional Keyword Planner. Skip `research/ads_keyword_*.py` when they are empty.
+- `GITHUB_TOKEN` — optional. Push uses existing git credentials. Ask only if push fails for lack of auth.
+
+## Daily run
+
+1. `git pull` in the working copy.
+2. `python scripts/check_setup.py`.
+3. Pull bulk data once into `reports/YYYY-MM/YYYY-MM-DD-*` files. Match memes from those files. Details are in `docs/routine-prompt.md`.
+4. `python scripts/update_tracker.py` then `python scripts/backtest.py`.
+5. Write the digest markdown, then `python scripts/build_report.py --date YYYY-MM-DD --pack reports/YYYY-MM/YYYY-MM-DD-meme-pack.json`.
+6. Commit and push the day's report files.
+7. Run `python scripts/sync_lark.py --as-of YYYY-MM-DD` only when Lark is enabled. It writes batches under `data/lark-batches/` and refuses to run when required Lark ids are empty.

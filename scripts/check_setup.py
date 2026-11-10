@@ -1,11 +1,9 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""Print what a daily run still needs. Do not ask about scope.
+"""Preflight for a daily digest. Do not ask about scope.
 
-Scope (regions, platforms, watchlist, language) is fixed in the repo.
-This script only reports missing logins, secrets, and settings.
-A blocked step is something the run cannot do until that item is set.
-A skipped item is optional: note it and continue. Do not ask about it.
+Prints which settings and secrets are present or missing, and which
+pipeline steps will run or be skipped. Ask only for lines under Ask.
 """
 from __future__ import annotations
 
@@ -52,51 +50,60 @@ def _section(title: str, rows: list[str]) -> None:
 def main() -> int:
     print("Do not ask about scope. Regions, platforms, watchlist accounts, and language are already set. Use them as-is.")
     print()
+    print("Minimum path")
+    print("  Lark and Google Ads are optional. With both unset, still write")
+    print(f"  {P.REPORTS_DIR}/YYYY-MM/YYYY-MM-DD-daily-report.md and .docx.")
+    print("  Ask only for a missing login or setting that blocks one step. Say what it unlocks and what you will skip.")
+    print("  Optional gaps are skipped. Do not ask about them.")
+    print()
     print("Fixed scope")
     print("  - Platforms: TikTok, then CapCut, then Instagram Reels. Never Douyin.")
-    print("  - Creative Center regions: " + ", ".join(REGIONS) + ". Skip NL.")
+    print("  - Creative Center regions: " + ", ".join(REGIONS) + ". NL is not offered; skip it.")
     print("  - Periods: 7 and 30 days. Industry: News & Entertainment.")
-    print(f"  - Watchlist file: {P.WATCHLIST.relative_to(P.REPO_ROOT)} ({_watchlist_count()} accounts).")
+    print(f"  - Watchlist: {P.WATCHLIST.relative_to(P.REPO_ROOT)} ({_watchlist_count()} public accounts).")
     print("  - Report language: Chinese. Scoring: docs/scoring.md.")
-    print(f"  - Reports directory: {P.REPORTS_DIR}")
-    print(f"  - Data directory: {P.DATA_DIR}")
-    print()
-    print("Ask only when a line below is under Blocked. Say which step needs it and what is skipped without it.")
-    print("Lines under Skipped are optional. Note them and continue. Do not ask.")
+    print(f"  - Local config directory: {P.config_dir()}")
     print()
 
-    blocked: list[str] = []
+    present: list[str] = []
+    ask: list[str] = []
     skipped: list[str] = []
+    try_first: list[str] = []
 
-    if not P.WATCHLIST.exists():
-        blocked.append(
-            "Coverage step needs config/watchlist.csv. Without that file, the watchlist pull is skipped."
+    if P.WATCHLIST.exists():
+        present.append(f"config/watchlist.csv ({_watchlist_count()} accounts)")
+    else:
+        ask.append(
+            "Coverage needs config/watchlist.csv. Without it, skip the watchlist pull. "
+            "The rest of the report still runs."
         )
 
-    font = P.FONT
-    if not font.exists():
-        blocked.append(
-            "scripts/build_report.py needs a CJK font at "
-            f"{font}. Set paths.font or put the file there. "
-            "Without it, chart generation and the Word report are skipped. "
-            "Tracker update and backtest still run."
+    reportlib = P.reportlib_dir() / "reportlib" / "docx_report.py"
+    if reportlib.exists():
+        present.append(f"reportlib at {reportlib.parent}")
+    else:
+        ask.append(
+            f"Word report needs the reportlib package ({reportlib}). "
+            "Set paths.reportlib. Without it, skip the .docx. Markdown can still be written by hand."
         )
 
-    reportlib = P.reportlib_dir() / "reportlib"
-    if not (reportlib / "docx_report.py").exists():
-        blocked.append(
-            "scripts/build_report.py needs the reportlib package at "
-            f"{reportlib}. Set paths.reportlib if it lives elsewhere. "
-            "Without it, the Word report is skipped."
+    if P.FONT.is_file():
+        present.append(f"CJK font {P.FONT}")
+    else:
+        skipped.append(
+            f"CJK font is missing ({P.FONT}). Charts fall back to DejaVu Sans and Chinese glyphs in charts may be blank. "
+            "The markdown and docx are still written. Set paths.font to improve charts. Do not ask."
         )
 
     lark = P.lark_config()
     if not P.lark_enabled():
+        present.append("lark.enabled = false")
         skipped.append(
-            "Lark Wiki import and Base append are skipped because lark.enabled is false. "
-            "Turn it on in local settings only if this run should sync."
+            "Lark Wiki import and Base append are skipped. "
+            "They unlock a Wiki doc and rows in the Base. Leave them off unless this run should sync. Do not ask."
         )
     else:
+        present.append("lark.enabled = true")
         missing = []
         if not str(lark.get("base_app_token") or "").strip():
             missing.append("lark.base_app_token")
@@ -109,62 +116,71 @@ def main() -> int:
             if not str(tables.get(key) or "").strip():
                 missing.append(f"lark.tables.{key}")
         if missing:
-            blocked.append(
-                "Lark sync is on and needs "
+            ask.append(
+                "Lark sync is on and unlocks Wiki import plus Base append. It needs "
                 + ", ".join(missing)
-                + f" in {P.config_dir() / 'settings.yaml'} "
-                "(or LARK_BASE_APP_TOKEN, LARK_WIKI_PARENT_URL, LARK_TABLE_*). "
-                "Without them, Wiki import and Base append are skipped. "
-                "The report files are still written and pushed."
+                + f" in {P.config_dir() / 'settings.yaml'}. "
+                "Without them, skip Lark only. The report files are still written."
             )
+        else:
+            present.append("Lark base token, wiki parent, and table ids")
         if not str(lark.get("base_url") or "").strip():
-            skipped.append("lark.base_url is empty. Sync can still run; the stored Base link is omitted.")
+            skipped.append("lark.base_url is empty. Sync can still run. Do not ask.")
         if not str(lark.get("authorized_by") or "").strip():
-            skipped.append("lark.authorized_by is empty. Omit authorizedBy unless a write is rejected for that.")
-        docs = P.lark_digest_docs()
-        if not any(docs.values()):
-            skipped.append("lark.digest_docs is empty. Digest-index doc links are skipped.")
-        if not str(tables.get("default_table") or "").strip():
-            skipped.append("lark.tables.default_table is empty. The empty default table is left as-is.")
+            skipped.append("lark.authorized_by is empty. Omit it unless a write is rejected. Do not ask.")
+        if not any(P.lark_digest_docs().values()):
+            skipped.append("lark.digest_docs is empty. Digest-index doc links are skipped. Do not ask.")
+        if not str((tables or {}).get("default_table") or "").strip():
+            skipped.append("lark.tables.default_table is empty. The empty default table is left as-is. Do not ask.")
 
     secrets = P.merged_secrets()
     ads_id = P.google_ads_customer_id()
     ads_missing = [key for key in ADS_SECRETS if not secrets.get(key)]
-    if not ads_id or ads_missing:
+    if ads_id and not ads_missing:
+        present.append("Google Ads customer id and OAuth secrets")
+    else:
         parts = []
         if not ads_id:
             parts.append("google_ads.customer_id")
         parts.extend(ads_missing)
         skipped.append(
-            "Google Ads Keyword Planner is skipped. It needs "
+            "Google Ads Keyword Planner is skipped. It unlocks search-volume research in research/ads_keyword_*.py and needs "
             + ", ".join(parts)
-            + f" ({P.config_dir() / 'settings.yaml'} and {P.config_dir() / '.env'}). "
-            "The daily meme report does not need this step."
-        )
-    if not secrets.get("GOOGLE_ADS_DEVELOPER_TOKEN"):
-        skipped.append(
-            "GOOGLE_ADS_DEVELOPER_TOKEN is unset. Keyword Planner calls omit it unless the API rejects them."
+            + ". The daily meme report does not use this. Do not ask."
         )
     if not secrets.get("GITHUB_TOKEN"):
         skipped.append(
-            "GITHUB_TOKEN is unset. git push uses existing git credentials. "
-            "Ask for GITHUB_TOKEN only if push fails for lack of auth."
+            "GITHUB_TOKEN is unset. It only unlocks git push when the machine has no git credentials. "
+            "Try the normal push first. Ask only if that push fails for lack of auth."
         )
+    else:
+        present.append("GITHUB_TOKEN")
 
+    try_first.append(
+        "X API is not stored in this repo. It unlocks 7-day post counts. "
+        "Try it. If unauthorized, ask once, then skip X heat points and record the gap. Do not invent counts."
+    )
+    try_first.append(
+        "TikTok Creative Center browser login is not stored here. It unlocks the 8-region Top 100 and detail pages. "
+        "Try it. If logged out, ask once, then skip that bulk pull and say so."
+    )
     skipped.append(
-        "Browser logins are not checked here. If TikTok Creative Center, TikTok, or Instagram "
-        "login expires during a pull, ask only for that login, skip that pull, and continue. "
-        "Do not ask which regions or accounts to use."
+        "Instagram login is optional. It unlocks watchlist profile grids. "
+        "If login is missing, skip Instagram rows and say so. Do not ask which accounts to drop."
     )
 
-    _section("Blocked — ask for these, then skip only that step", blocked)
+    _section("Present", present)
     print()
-    _section("Skipped — optional, do not ask", skipped)
+    _section("Ask — missing, and this step is skipped without it", ask)
     print()
-    if blocked:
-        print("Result: a required item is missing. Ask only for the blocked items above.")
+    _section("Try first — ask only if that pull rejects auth", try_first)
+    print()
+    _section("Skipped — optional; do not ask", skipped)
+    print()
+    if ask:
+        print("Result: ask only for the Ask lines. The markdown/docx report is still the default output.")
         return 1
-    print("Result: nothing required is missing. Do not ask the user. Proceed with the fixed scope.")
+    print("Result: minimum path is ready. Do not ask the user. Write the report, and skip the optional steps above.")
     return 0
 
 
