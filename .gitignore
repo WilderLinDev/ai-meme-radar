@@ -1,18 +1,11 @@
-.env
-*.env
-!config/.env.example
-.secrets/
-config/.env
-config/settings.yaml
-
 __pycache__/
 *.py[cod]
 .venv/
-venv/
+.pytest_cache/
 
-# Google Ads 运行产物和访问令牌缓存
-research/output/
-*.access_token
+# local settings never live in the repo
+config/settings.toml
 
-# Lark 批次是同步开启时的中间文件
+# Lark batches are intermediate files, written only when sync is on
 data/lark-batches/
+.idea/

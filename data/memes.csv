@@ -1,0 +1,27 @@
+id,name,name_zh,aliases,cc_hashtags,primary_metric,primary_region,first_seen,notes
+a2olite,#a2olite,A2O Lite 舞蹈,,a2olite,cc_index_30d,KR,2026-11-10,Creative Center KR 30 日相对指数【已核实·CC相对指数】
+angelofmydreams,#angelofmydreams,Angel of My Dreams,,angelofmydreams,cc_index_30d,US,2026-11-10,Creative Center US 30 日相对指数【已核实·CC相对指数】
+ba-ba-ba,Ba Ba Ba Dance,图书馆双人舞,,,viralremix_new_videos,,2026-11-10,ViralRemix daily board new videos/day【第三方读数】
+bicep-heart,Bicep Heart,二头肌比心,,,x_posts,,2026-11-10,X get_posts_counts_recent 日发帖（报告用它判断高峰）【已核实】
+can-i-ride,Can I Ride,双人轮流舞,,,viralremix_new_videos,,2026-11-10,ViralRemix daily board new videos/day【第三方读数】
+cat-ultra-bee,Cat on Ultra Bee,猫骑越野车,,,none,,2026-11-10,无 ViralRemix 日榜，X 近 7 日完整日为 0；没有可用于回测的全站日热度序列。
+damehombro,#damehombro,把肩膀给我（抖肩舞）,,damehombro,cc_index_30d,US,2026-11-10,Creative Center US 30 日相对指数【已核实·CC相对指数】
+deck-the-halls,Deck the Halls Dance,Deck the Halls 圣诞舞,,,none,,2026-11-10,无 ViralRemix 日榜；Turnly 创作者计数不是全站日产量。
+flamingo-float,Flamingo Float,火烈鸟泳圈,,,none,,2026-11-10,无 ViralRemix 日榜；报告用二创发布日判断高峰，不是全站日产量。
+flower-bouquet-with-face,Flower Bouquet With Face,花束里的脸,,,viralremix_new_videos,,2026-11-10,ViralRemix daily board new videos/day【第三方读数】
+grandpa-fish,Grandpa Fish,切鱼梗,,,none,,2026-11-10,无 ViralRemix 日榜；报告用二创发布日判断高峰，不是全站日产量。
+halloweentransition,#halloweentransition,万圣节变装过渡,,halloweentransition,cc_index_30d,US,2026-11-10,Creative Center US 30 日相对指数【已核实·CC相对指数】
+housewife,#housewife,Housewife 舞,,housewife,cc_index_30d,US,2026-11-10,Creative Center US 30 日相对指数【已核实·CC相对指数】
+imsosorry,#imsosorry,精修图道歉揭穿,,imsosorry,cc_index_30d,US,2026-11-10,Creative Center US 30 日相对指数【已核实·CC相对指数】
+lastchristmas,#lastchristmas,圣诞情侣怀旧短片,,lastchristmas|couplescostume,cc_index_30d,US,2026-11-10,Creative Center US News&Entertainment 30 日相对指数 0–100【已核实·CC相对指数】
+malfoid,Malfoid,女版马尔福,,,x_posts,,2026-11-10,X get_posts_counts_recent 日发帖【已核实】
+mandem,#mandem,Mandem 照片格式,,mandem,cc_index_30d,AU,2026-11-10,Creative Center AU 30 日相对指数【已核实·CC相对指数】
+meimei,#meimei,Meimei 萌感短片,,meimei,cc_index_30d,GB,2026-11-10,Creative Center GB 30 日相对指数（7 日曲线在 CA）【已核实·CC相对指数】
+pet-rock,Pet Rock Dance,宠物摇滚头锤,,,viralremix_new_videos,,2026-11-10,ViralRemix daily board new videos/day【第三方读数】
+pimpwalk,Pimpwalk Entrance,Pimpwalk 进场,,,viralremix_new_videos,,2026-11-10,ViralRemix daily board new videos/day【第三方读数】
+police-chase-ai,Police Chase AI,AI 警察追逐,,,viralremix_new_videos,,2026-11-10,ViralRemix daily board new videos/day【第三方读数】
+shaking-head,Shaking Head,宠物摇头,,,viralremix_new_videos,,2026-11-10,ViralRemix daily board new videos/day【第三方读数】
+shoulder-carry,Shoulder Carry,I'm the One 扛肩翻身,,,viralremix_new_videos,,2026-11-10,ViralRemix daily board new videos/day【第三方读数】
+then-i-walk-in,Then I Walk In,推门走入,,,viralremix_new_videos,,2026-11-10,ViralRemix daily board new videos/day【第三方读数】
+turning-mom,Turning My Mom Into Me,把妈妈变成我,,,viralremix_new_videos,,2026-11-10,ViralRemix daily board new videos/day【第三方读数】
+winter-horror,冬日恐悚 / 悬疑反转,学格式，不追比赛标签,冬日恐悚,tiktokscaryhorrorcontest|tiktokthrillermysterycontest,cc_index_30d,US,2026-11-10,Creative Center #tiktokscaryhorrorcontest 30 日相对指数（主标签）；#tiktokthrillermysterycontest 另有一条曲线【已核实·CC相对指数】

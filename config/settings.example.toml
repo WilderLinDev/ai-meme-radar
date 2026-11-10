@@ -1,0 +1,26 @@
+# Copy to ~/.config/ai-meme-radar/settings.toml ($AMR_CONFIG_DIR overrides the folder).
+# Keep this example empty. Do not commit real ids. Nothing here is a secret.
+
+[lark]
+enabled = false          # master switch; reports are written either way
+base_app_token = ""      # the id in the Base URL
+base_url = ""
+wiki_parent_url = ""     # Wiki node the day's .docx is imported under
+authorized_by = ""       # only if the connector asks for it
+
+[lark.tables]            # table key (config/lark-base.json) -> Lark table_id
+cc_rank_snapshot = ""
+cc_hashtag_curve = ""
+cc_hashtag_audience = ""
+meme_daily_tracker = ""
+remix_videos = ""
+backtest = ""
+watchlist = ""
+digest_index = ""
+
+[lark.digest_docs]       # "YYYY-MM-DD" = "imported doc URL"
+
+[paths]                  # empty = <repo>/data, <repo>/reports, assets/fonts/NotoSansSC-Regular.otf
+data_dir = ""
+reports_dir = ""
+font = ""

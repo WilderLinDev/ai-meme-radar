@@ -1,0 +1,1112 @@
+{
+  "base_name": "AI视频梗数据库",
+  "base_timezone": "America/Los_Angeles",
+  "notes": [
+    "Each table reads one source (see src/radar/export/lark.py SOURCES); each field's `from` is a source column, `map` translates values.",
+    "Dedupe key = the listed fields' display values joined with |. Do not change it for a table that already has rows.",
+    "URL fields are written as {link, text}. Dates are ms at 00:00 in base_timezone. Number formatter must be 0, 0.0 or 0.00.",
+    "create_records takes an inlined JSON array, at most 500 per call; batches are 40 records. Do not delete or rename the empty default table."
+  ],
+  "tables": [
+    {
+      "key": "cc_rank_snapshot",
+      "name": "CC榜单快照",
+      "source": "cc_top100",
+      "dedupe": [
+        "抓取日期",
+        "地区",
+        "周期",
+        "排名",
+        "话题"
+      ],
+      "fields": [
+        {
+          "field_name": "去重键",
+          "type": 1
+        },
+        {
+          "field_name": "抓取日期",
+          "type": 5,
+          "property": {
+            "date_formatter": "yyyy-MM-dd",
+            "auto_fill": false
+          },
+          "from": "capture_date"
+        },
+        {
+          "field_name": "地区",
+          "type": 3,
+          "property": {
+            "options": [
+              {
+                "name": "US"
+              },
+              {
+                "name": "GB"
+              },
+              {
+                "name": "AU"
+              },
+              {
+                "name": "CA"
+              },
+              {
+                "name": "DE"
+              },
+              {
+                "name": "JP"
+              },
+              {
+                "name": "KR"
+              },
+              {
+                "name": "FR"
+              },
+              {
+                "name": "NL"
+              }
+            ]
+          },
+          "from": "region"
+        },
+        {
+          "field_name": "行业",
+          "type": 1,
+          "from": "industry"
+        },
+        {
+          "field_name": "周期",
+          "type": 3,
+          "property": {
+            "options": [
+              {
+                "name": "7日"
+              },
+              {
+                "name": "30日"
+              }
+            ]
+          },
+          "from": "period",
+          "map": {
+            "7": "7日",
+            "30": "30日"
+          }
+        },
+        {
+          "field_name": "排名",
+          "type": 2,
+          "property": {
+            "formatter": "0"
+          },
+          "from": "rank"
+        },
+        {
+          "field_name": "话题",
+          "type": 1,
+          "from": "hashtag"
+        },
+        {
+          "field_name": "发帖数",
+          "type": 2,
+          "property": {
+            "formatter": "0"
+          },
+          "from": "posts"
+        },
+        {
+          "field_name": "播放量",
+          "type": 2,
+          "property": {
+            "formatter": "0"
+          },
+          "from": "views"
+        },
+        {
+          "field_name": "排名变化",
+          "type": 2,
+          "property": {
+            "formatter": "0"
+          },
+          "from": "rank_change"
+        },
+        {
+          "field_name": "详情ID",
+          "type": 1,
+          "from": "detail_id"
+        },
+        {
+          "field_name": "详情链接",
+          "type": 15,
+          "from": "detail_url"
+        }
+      ]
+    },
+    {
+      "key": "cc_hashtag_curve",
+      "name": "CC话题曲线",
+      "source": "cc_curves",
+      "dedupe": [
+        "抓取日期",
+        "话题",
+        "地区",
+        "周期",
+        "日期"
+      ],
+      "fields": [
+        {
+          "field_name": "去重键",
+          "type": 1
+        },
+        {
+          "field_name": "抓取日期",
+          "type": 5,
+          "property": {
+            "date_formatter": "yyyy-MM-dd",
+            "auto_fill": false
+          },
+          "from": "capture_date"
+        },
+        {
+          "field_name": "话题",
+          "type": 1,
+          "from": "hashtag"
+        },
+        {
+          "field_name": "地区",
+          "type": 3,
+          "property": {
+            "options": [
+              {
+                "name": "US"
+              },
+              {
+                "name": "GB"
+              },
+              {
+                "name": "AU"
+              },
+              {
+                "name": "CA"
+              },
+              {
+                "name": "DE"
+              },
+              {
+                "name": "JP"
+              },
+              {
+                "name": "KR"
+              },
+              {
+                "name": "FR"
+              },
+              {
+                "name": "NL"
+              }
+            ]
+          },
+          "from": "region"
+        },
+        {
+          "field_name": "周期",
+          "type": 3,
+          "property": {
+            "options": [
+              {
+                "name": "7日"
+              },
+              {
+                "name": "30日"
+              }
+            ]
+          },
+          "from": "period",
+          "map": {
+            "7": "7日",
+            "30": "30日"
+          }
+        },
+        {
+          "field_name": "日期",
+          "type": 5,
+          "property": {
+            "date_formatter": "yyyy-MM-dd",
+            "auto_fill": false
+          },
+          "from": "date"
+        },
+        {
+          "field_name": "热度指数",
+          "type": 2,
+          "property": {
+            "formatter": "0.0"
+          },
+          "from": "value"
+        },
+        {
+          "field_name": "详情ID",
+          "type": 1,
+          "from": "detail_id"
+        },
+        {
+          "field_name": "详情链接",
+          "type": 15,
+          "from": "detail_url"
+        }
+      ]
+    },
+    {
+      "key": "cc_hashtag_audience",
+      "name": "CC话题受众",
+      "source": "cc_audience",
+      "dedupe": [
+        "抓取日期",
+        "话题",
+        "地区",
+        "周期",
+        "维度",
+        "分组"
+      ],
+      "fields": [
+        {
+          "field_name": "去重键",
+          "type": 1
+        },
+        {
+          "field_name": "抓取日期",
+          "type": 5,
+          "property": {
+            "date_formatter": "yyyy-MM-dd",
+            "auto_fill": false
+          },
+          "from": "capture_date"
+        },
+        {
+          "field_name": "话题",
+          "type": 1,
+          "from": "hashtag"
+        },
+        {
+          "field_name": "地区",
+          "type": 3,
+          "property": {
+            "options": [
+              {
+                "name": "US"
+              },
+              {
+                "name": "GB"
+              },
+              {
+                "name": "AU"
+              },
+              {
+                "name": "CA"
+              },
+              {
+                "name": "DE"
+              },
+              {
+                "name": "JP"
+              },
+              {
+                "name": "KR"
+              },
+              {
+                "name": "FR"
+              },
+              {
+                "name": "NL"
+              }
+            ]
+          },
+          "from": "region"
+        },
+        {
+          "field_name": "周期",
+          "type": 3,
+          "property": {
+            "options": [
+              {
+                "name": "7日"
+              },
+              {
+                "name": "30日"
+              }
+            ]
+          },
+          "from": "period",
+          "map": {
+            "7": "7日",
+            "30": "30日"
+          }
+        },
+        {
+          "field_name": "维度",
+          "type": 3,
+          "property": {
+            "options": [
+              {
+                "name": "年龄"
+              },
+              {
+                "name": "地区"
+              },
+              {
+                "name": "兴趣"
+              }
+            ]
+          },
+          "from": "dimension",
+          "map": {
+            "age": "年龄",
+            "country": "地区",
+            "interest": "兴趣"
+          }
+        },
+        {
+          "field_name": "分组",
+          "type": 1,
+          "from": "bucket"
+        },
+        {
+          "field_name": "占比",
+          "type": 2,
+          "property": {
+            "formatter": "0.00"
+          },
+          "from": "value"
+        }
+      ]
+    },
+    {
+      "key": "meme_daily_tracker",
+      "name": "梗每日追踪",
+      "source": "tracker",
+      "dedupe": [
+        "日期",
+        "规范ID"
+      ],
+      "fields": [
+        {
+          "field_name": "去重键",
+          "type": 1
+        },
+        {
+          "field_name": "日期",
+          "type": 5,
+          "property": {
+            "date_formatter": "yyyy-MM-dd",
+            "auto_fill": false
+          },
+          "from": "date"
+        },
+        {
+          "field_name": "梗",
+          "type": 1,
+          "from": "name"
+        },
+        {
+          "field_name": "规范ID",
+          "type": 1,
+          "from": "meme_id"
+        },
+        {
+          "field_name": "结论",
+          "type": 3,
+          "property": {
+            "options": [
+              {
+                "name": "做"
+              },
+              {
+                "name": "观望"
+              },
+              {
+                "name": "不做"
+              }
+            ]
+          },
+          "from": "verdict",
+          "map": {
+            "make": "做",
+            "watch": "观望",
+            "skip": "不做"
+          }
+        },
+        {
+          "field_name": "综合评分",
+          "type": 2,
+          "property": {
+            "formatter": "0"
+          },
+          "from": "total"
+        },
+        {
+          "field_name": "热度分",
+          "type": 2,
+          "property": {
+            "formatter": "0"
+          },
+          "from": "heat"
+        },
+        {
+          "field_name": "趋势分",
+          "type": 2,
+          "property": {
+            "formatter": "0"
+          },
+          "from": "trend"
+        },
+        {
+          "field_name": "分享率分",
+          "type": 2,
+          "property": {
+            "formatter": "0"
+          },
+          "from": "share"
+        },
+        {
+          "field_name": "竞争分",
+          "type": 2,
+          "property": {
+            "formatter": "0"
+          },
+          "from": "competition"
+        },
+        {
+          "field_name": "窗口分",
+          "type": 2,
+          "property": {
+            "formatter": "0"
+          },
+          "from": "window"
+        },
+        {
+          "field_name": "主热度口径",
+          "type": 1,
+          "from": "primary_metric"
+        },
+        {
+          "field_name": "主热度值",
+          "type": 2,
+          "property": {
+            "formatter": "0.00"
+          },
+          "from": "primary_value"
+        },
+        {
+          "field_name": "主热度日期",
+          "type": 5,
+          "property": {
+            "date_formatter": "yyyy-MM-dd",
+            "auto_fill": false
+          },
+          "from": "primary_date"
+        },
+        {
+          "field_name": "二创中位分享率",
+          "type": 2,
+          "property": {
+            "formatter": "0.00"
+          },
+          "from": "share_median"
+        },
+        {
+          "field_name": "二创样本数",
+          "type": 2,
+          "property": {
+            "formatter": "0"
+          },
+          "from": "share_n"
+        },
+        {
+          "field_name": "已火天数",
+          "type": 2,
+          "property": {
+            "formatter": "0"
+          },
+          "from": "days_hot"
+        },
+        {
+          "field_name": "高峰状态",
+          "type": 1,
+          "from": "peak_status",
+          "map": {
+            "rising": "上升中",
+            "peak": "峰值",
+            "near_peak": "接近峰值",
+            "declining": "回落",
+            "unknown": "数据不足"
+          }
+        },
+        {
+          "field_name": "部分",
+          "type": 3,
+          "property": {
+            "options": [
+              {
+                "name": "主榜"
+              },
+              {
+                "name": "早期信号"
+              }
+            ]
+          },
+          "from": "part",
+          "map": {
+            "main": "主榜",
+            "early": "早期信号"
+          }
+        },
+        {
+          "field_name": "来源标签",
+          "type": 1,
+          "from": "cc_regions"
+        }
+      ]
+    },
+    {
+      "key": "remix_videos",
+      "name": "二创视频",
+      "source": "remixes",
+      "dedupe": [
+        "日报日期",
+        "链接"
+      ],
+      "fields": [
+        {
+          "field_name": "去重键",
+          "type": 1
+        },
+        {
+          "field_name": "日报日期",
+          "type": 5,
+          "property": {
+            "date_formatter": "yyyy-MM-dd",
+            "auto_fill": false
+          },
+          "from": "report_date"
+        },
+        {
+          "field_name": "梗",
+          "type": 1,
+          "from": "meme_id"
+        },
+        {
+          "field_name": "链接",
+          "type": 15,
+          "from": "link"
+        },
+        {
+          "field_name": "平台",
+          "type": 3,
+          "property": {
+            "options": [
+              {
+                "name": "TikTok"
+              },
+              {
+                "name": "Instagram"
+              },
+              {
+                "name": "X"
+              },
+              {
+                "name": "YouTube"
+              },
+              {
+                "name": "CapCut"
+              },
+              {
+                "name": "其他"
+              }
+            ]
+          },
+          "from": "platform"
+        },
+        {
+          "field_name": "创作者",
+          "type": 1,
+          "from": "creator"
+        },
+        {
+          "field_name": "发布日期",
+          "type": 5,
+          "property": {
+            "date_formatter": "yyyy-MM-dd",
+            "auto_fill": false
+          },
+          "from": "posted_on"
+        },
+        {
+          "field_name": "播放",
+          "type": 2,
+          "property": {
+            "formatter": "0"
+          },
+          "from": "views"
+        },
+        {
+          "field_name": "点赞",
+          "type": 2,
+          "property": {
+            "formatter": "0"
+          },
+          "from": "likes"
+        },
+        {
+          "field_name": "分享",
+          "type": 2,
+          "property": {
+            "formatter": "0"
+          },
+          "from": "shares"
+        },
+        {
+          "field_name": "评论",
+          "type": 2,
+          "property": {
+            "formatter": "0"
+          },
+          "from": "comments"
+        },
+        {
+          "field_name": "收藏",
+          "type": 2,
+          "property": {
+            "formatter": "0"
+          },
+          "from": "saves"
+        },
+        {
+          "field_name": "是否AI",
+          "type": 3,
+          "property": {
+            "options": [
+              {
+                "name": "yes"
+              },
+              {
+                "name": "no"
+              },
+              {
+                "name": "unclear"
+              }
+            ]
+          },
+          "from": "is_ai",
+          "map": {
+            "yes": "是",
+            "no": "否",
+            "unclear": "不确定"
+          }
+        },
+        {
+          "field_name": "分享率",
+          "type": 2,
+          "property": {
+            "formatter": "0.00"
+          },
+          "from": "share_rate"
+        }
+      ]
+    },
+    {
+      "key": "backtest",
+      "name": "回测",
+      "source": "backtest",
+      "dedupe": [
+        "推荐日",
+        "规范ID"
+      ],
+      "fields": [
+        {
+          "field_name": "去重键",
+          "type": 1
+        },
+        {
+          "field_name": "推荐日",
+          "type": 5,
+          "property": {
+            "date_formatter": "yyyy-MM-dd",
+            "auto_fill": false
+          },
+          "from": "recommend_date"
+        },
+        {
+          "field_name": "梗",
+          "type": 1,
+          "from": "name"
+        },
+        {
+          "field_name": "规范ID",
+          "type": 1,
+          "from": "meme_id"
+        },
+        {
+          "field_name": "当时结论",
+          "type": 3,
+          "property": {
+            "options": [
+              {
+                "name": "做"
+              },
+              {
+                "name": "观望"
+              },
+              {
+                "name": "不做"
+              }
+            ]
+          },
+          "from": "verdict",
+          "map": {
+            "make": "做",
+            "watch": "观望",
+            "skip": "不做"
+          }
+        },
+        {
+          "field_name": "评分",
+          "type": 2,
+          "property": {
+            "formatter": "0"
+          },
+          "from": "total"
+        },
+        {
+          "field_name": "主热度口径",
+          "type": 1,
+          "from": "primary_metric"
+        },
+        {
+          "field_name": "基线值",
+          "type": 2,
+          "property": {
+            "formatter": "0.00"
+          },
+          "from": "baseline_value"
+        },
+        {
+          "field_name": "基线日期",
+          "type": 5,
+          "property": {
+            "date_formatter": "yyyy-MM-dd",
+            "auto_fill": false
+          },
+          "from": "baseline_date"
+        },
+        {
+          "field_name": "D+3日期",
+          "type": 5,
+          "property": {
+            "date_formatter": "yyyy-MM-dd",
+            "auto_fill": false
+          },
+          "from": "d3_date"
+        },
+        {
+          "field_name": "D+3值",
+          "type": 2,
+          "property": {
+            "formatter": "0.00"
+          },
+          "from": "d3_value"
+        },
+        {
+          "field_name": "结果",
+          "type": 3,
+          "property": {
+            "options": [
+              {
+                "name": "对"
+              },
+              {
+                "name": "错"
+              },
+              {
+                "name": "待定"
+              },
+              {
+                "name": "数据不足"
+              }
+            ]
+          },
+          "from": "result",
+          "map": {
+            "hit": "对",
+            "miss": "错",
+            "pending": "待定",
+            "insufficient": "数据不足"
+          }
+        },
+        {
+          "field_name": "说明",
+          "type": 1,
+          "from": "note"
+        },
+        {
+          "field_name": "结论卡一句",
+          "type": 1,
+          "from": "line_zh"
+        }
+      ]
+    },
+    {
+      "key": "watchlist",
+      "name": "监控账号",
+      "source": "watchlist",
+      "dedupe": [
+        "平台",
+        "handle"
+      ],
+      "fields": [
+        {
+          "field_name": "去重键",
+          "type": 1
+        },
+        {
+          "field_name": "状态",
+          "type": 3,
+          "property": {
+            "options": [
+              {
+                "name": "候选"
+              },
+              {
+                "name": "已选"
+              }
+            ]
+          },
+          "from": "selected",
+          "map": {
+            "yes": "已选",
+            "no": "候选"
+          }
+        },
+        {
+          "field_name": "排序",
+          "type": 2,
+          "property": {
+            "formatter": "0"
+          },
+          "from": "rank"
+        },
+        {
+          "field_name": "平台",
+          "type": 3,
+          "property": {
+            "options": [
+              {
+                "name": "TikTok"
+              },
+              {
+                "name": "Instagram"
+              },
+              {
+                "name": "X"
+              },
+              {
+                "name": "YouTube"
+              },
+              {
+                "name": "CapCut"
+              },
+              {
+                "name": "其他"
+              }
+            ]
+          },
+          "from": "platform"
+        },
+        {
+          "field_name": "handle",
+          "type": 1,
+          "from": "handle"
+        },
+        {
+          "field_name": "主页链接",
+          "type": 15,
+          "from": "profile_url"
+        },
+        {
+          "field_name": "类型",
+          "type": 1,
+          "from": "type"
+        },
+        {
+          "field_name": "显示名",
+          "type": 1,
+          "from": "display_name"
+        },
+        {
+          "field_name": "粉丝数",
+          "type": 2,
+          "property": {
+            "formatter": "0"
+          },
+          "from": "followers"
+        },
+        {
+          "field_name": "粉丝统计日",
+          "type": 5,
+          "property": {
+            "date_formatter": "yyyy-MM-dd",
+            "auto_fill": false
+          },
+          "from": "followers_as_of"
+        },
+        {
+          "field_name": "粉丝来源",
+          "type": 1,
+          "from": "followers_source"
+        },
+        {
+          "field_name": "粉丝标签",
+          "type": 3,
+          "property": {
+            "options": [
+              {
+                "name": "【已核实】"
+              },
+              {
+                "name": "【第三方读数】"
+              },
+              {
+                "name": "【估算】"
+              }
+            ]
+          },
+          "from": "followers_tag"
+        },
+        {
+          "field_name": "视频数",
+          "type": 2,
+          "property": {
+            "formatter": "0"
+          },
+          "from": "video_count"
+        },
+        {
+          "field_name": "开号日期",
+          "type": 5,
+          "property": {
+            "date_formatter": "yyyy-MM-dd",
+            "auto_fill": false
+          },
+          "from": "account_created"
+        },
+        {
+          "field_name": "更新频率",
+          "type": 1,
+          "from": "posting_frequency"
+        },
+        {
+          "field_name": "早发证据梗",
+          "type": 1,
+          "from": "evidence_meme"
+        },
+        {
+          "field_name": "证据日期",
+          "type": 1,
+          "from": "evidence_date"
+        },
+        {
+          "field_name": "证据链接",
+          "type": 1,
+          "from": "evidence_link"
+        },
+        {
+          "field_name": "证据说明",
+          "type": 1,
+          "from": "evidence_note"
+        },
+        {
+          "field_name": "语言",
+          "type": 1,
+          "from": "language"
+        },
+        {
+          "field_name": "地区",
+          "type": 1,
+          "from": "region"
+        },
+        {
+          "field_name": "地区来源",
+          "type": 1,
+          "from": "region_source"
+        },
+        {
+          "field_name": "推荐理由",
+          "type": 1,
+          "from": "why"
+        },
+        {
+          "field_name": "注意",
+          "type": 1,
+          "from": "caveats"
+        },
+        {
+          "field_name": "主页核对",
+          "type": 1,
+          "from": "profile_spotcheck"
+        },
+        {
+          "field_name": "简介",
+          "type": 1,
+          "from": "bio"
+        }
+      ]
+    },
+    {
+      "key": "digest_index",
+      "name": "日报索引",
+      "source": "digest",
+      "dedupe": [
+        "日期"
+      ],
+      "fields": [
+        {
+          "field_name": "去重键",
+          "type": 1
+        },
+        {
+          "field_name": "日期",
+          "type": 5,
+          "property": {
+            "date_formatter": "yyyy-MM-dd",
+            "auto_fill": false
+          },
+          "from": "date"
+        },
+        {
+          "field_name": "Lark链接",
+          "type": 15,
+          "from": "doc_url"
+        },
+        {
+          "field_name": "做的梗",
+          "type": 1,
+          "from": "make"
+        },
+        {
+          "field_name": "观望的梗",
+          "type": 1,
+          "from": "watch"
+        },
+        {
+          "field_name": "不做的梗",
+          "type": 1,
+          "from": "skip"
+        },
+        {
+          "field_name": "备注",
+          "type": 1,
+          "from": "note"
+        }
+      ]
+    }
+  ]
+}
