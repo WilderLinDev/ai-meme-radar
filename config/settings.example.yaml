@@ -8,5 +8,5 @@ google_ads:
   env_file: ""
 
 paths:
-  # reportlib 包所在目录（图表和 docx 主题）。留空则在 /workspace/lark 存在时使用它。
+  # 留空即使用仓库里的 scripts/reportlib。只有要换一份实现时才填目录。
   reportlib: ""

@@ -12,12 +12,11 @@ Daily overseas AI-meme video radar. TikTok first, then CapCut, then Instagram Re
 
 ```
 docs/                         提示词、日程、数据字典、评分
-scripts/                      日报流水线，扁平放置
+scripts/                      日报流水线。reportlib/ 是图表和 Word 主题
 research/                     Google Ads Keyword Planner
 config/                       监控名单、Lark 表结构、设置示例
 reports/2026-11/              某月的全部日报文件，不再分子目录
 data/                         累计追踪表和回测
-legacy/                       已被替换的旧版报告生成器
 ```
 
 月份目录是一层：`reports/2026-11/`、`reports/2026-12/`。没有 `reports/2026/11/`，也没有按天再套一层文件夹。
@@ -27,7 +26,7 @@ legacy/                       已被替换的旧版报告生成器
 - Python 用小写蛇形：`build_report.py`、`sync_lark.py`。
 - 文档、配置和日报产物用 kebab-case。
 - 当天文件一律 `YYYY-MM-DD-<名字>.<后缀>`，直接放在月份目录里。
-- 不在文件名里写版本或运行批次。现行报告生成器就叫 `scripts/build_report.py`。旧的四段式生成器在 `legacy/build_daily_report.py`。
+- 不在文件名里写版本或运行批次。报告生成器是 `scripts/build_report.py`，Word 组装是 `scripts/reportlib/docx_report.py`，Lark 同步是 `scripts/sync_lark.py`。
 - 图表不进 `charts/`。例如 `reports/2026-11/2026-11-10-heat-cat-on-ultra-bee.png`。
 
 2026-11-10 的样例包是 `reports/2026-11/2026-11-10-meme-pack.json`。
@@ -50,7 +49,7 @@ legacy/                       已被替换的旧版报告生成器
 
 ## 怎么跑
 
-在仓库根目录执行。报告图表和 docx 主题来自 `reportlib`，这个包不在仓库里。需要生成 Word 时，把包所在目录写进 `config/settings.yaml` 的 `paths.reportlib`，或者让它留在 `/workspace/lark`。依赖见 `requirements.txt`（`python-docx`、`requests`，图表需要 `matplotlib`）。中文字体默认找 `assets/fonts/NotoSansSC-Regular.otf`，字体文件不随仓库提供。
+在仓库根目录执行。图表和 Word 主题在 `scripts/reportlib/`，`paths.reportlib` 默认就是这个位置，不用另配。依赖见 `requirements.txt`（`python-docx`、`requests`、`matplotlib`、`numpy`）。中文字体默认找 `assets/fonts/NotoSansSC-Regular.otf`，字体文件不随仓库提供。
 
 追踪表：
 
@@ -100,11 +99,10 @@ python scripts/build_meme_pack.py
 
 它读 `2026-11-10` 的 `meme-pack-base.json`、`heat.json`、`cc-hashtag-detail.json`、`new-memes.json`（或旧文件名），写出 `reports/2026-11/2026-11-10-meme-pack.json`。没有这些输入时不要跑它，仓库里的样例包已经是成品。
 
-Lark 默认关闭。下面两条命令只会提示同步未开启，不会写批次：
+Lark 默认关闭。下面这条命令只会提示同步未开启，不会写批次：
 
 ```bash
 python scripts/sync_lark.py --as-of 2026-11-10
-python scripts/sync_lark_delta.py --as-of 2026-11-10
 ```
 
 打开同步：
@@ -112,11 +110,9 @@ python scripts/sync_lark_delta.py --as-of 2026-11-10
 ```bash
 python scripts/sync_lark.py --as-of 2026-11-10 --sync-lark \
   --existing-keys data/lark-batches/2026-11-10-existing-keys.json
-python scripts/sync_lark_delta.py --as-of 2026-11-10 --sync-lark \
-  --existing-keys data/lark-batches/2026-11-10-existing-keys.json
 ```
 
-也可以复制 `config/settings.example.yaml` 为 `config/settings.yaml`，把 `sync_lark` 设为 `true`。`--no-lark` 强制关闭。`sync_lark.py --schema-only` 只打印表名，不要求打开同步。`sync_lark.py` 生成新建批次；`sync_lark_delta.py` 在 Base 里已经有记录时生成新建和更新两套批次。批次写到 `data/lark-batches/`，该目录不入库。真正写入 Lark 仍走用户的 Lark 连接器，仓库里没有应用密钥。
+也可以复制 `config/settings.example.yaml` 为 `config/settings.yaml`，把 `sync_lark` 设为 `true`。`--no-lark` 强制关闭。`sync_lark.py --schema-only` 只打印表名，不要求打开同步。`--existing-keys` 给去重键列表时跳过这些行；给「去重键 → record_id」时，追踪、回测和日报索引会另写更新批次。批次在 `data/lark-batches/`，该目录不入库。真正写入 Lark 仍走用户的 Lark 连接器，仓库里没有应用密钥。
 
 Google Ads 关键词（Keyword Planner）。凭证从环境文件读取，脚本本身没有参数：
 

@@ -218,23 +218,21 @@ def google_ads_output_dir() -> Path:
     return REPO_ROOT / "research" / "output"
 
 
-def reportlib_dir() -> Path | None:
+def reportlib_dir() -> Path:
+    """Directory that contains the reportlib package. Default is scripts/."""
     settings = load_settings().get("paths") or {}
     configured = str(settings.get("reportlib") or "").strip()
     if configured:
         return Path(configured)
-    if LEGACY_LARK.is_dir():
-        return LEGACY_LARK
-    return None
+    return REPO_ROOT / "scripts"
 
 
 def prepare_reportlib() -> None:
-    """Put the external reportlib package on sys.path when it is available."""
+    """Put scripts/ (or a settings override) on sys.path so `import reportlib` works."""
     folder = reportlib_dir()
-    if folder and folder.is_dir():
-        entry = str(folder)
-        if entry not in sys.path:
-            sys.path.insert(0, entry)
+    entry = str(folder)
+    if entry not in sys.path:
+        sys.path.insert(0, entry)
 
 
 def add_lark_flags(parser) -> None:

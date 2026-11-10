@@ -55,7 +55,7 @@ Creative Center 的值是窗口内各自归一化的相对指数 0–100。7 日
 | 监控账号 | 平台\|handle |
 | 日报索引 | 日期\|版本 |
 
-URL 字段必须是 `{link, text}`，不能是纯字符串。日期写成 Base 时区（America/Los_Angeles）当天 00:00 的毫秒时间戳。
+URL 字段必须是 `{link, text}`，不能是纯字符串。日期写成 Base 时区（America/Los_Angeles）当天 00:00 的毫秒时间戳。CC话题受众里，年龄用「占比」；国家用「人气指数」，不是百分比。同步脚本只有 `scripts/sync_lark.py`。
 
 ## 旧路径
 

@@ -83,33 +83,13 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import paths as P  # noqa: E402
 
-
-def _load_reportlib():
-    P.prepare_reportlib()
-    try:
-        from reportlib.cc_lib import analyze_cc
-        from reportlib.cc_trends import load_cc_trends
-        from reportlib.charts import setup_font, chart_meme_heat_panel, chart_cc_hashtag_trend
-        from reportlib.docx_v5 import build_docx_v5
-        from reportlib.heat_lib import load_heat
-        from reportlib.remix_lib import load_remix_csv, summarize_remixes
-    except ImportError as exc:
-        raise SystemExit(
-            "reportlib is not on PYTHONPATH. Set paths.reportlib in config/settings.yaml "
-            "or keep the package at /workspace/lark. "
-            f"Original error: {exc}"
-        ) from exc
-    return {
-        "analyze_cc": analyze_cc,
-        "load_cc_trends": load_cc_trends,
-        "setup_font": setup_font,
-        "chart_meme_heat_panel": chart_meme_heat_panel,
-        "chart_cc_hashtag_trend": chart_cc_hashtag_trend,
-        "build_docx_v5": build_docx_v5,
-        "load_heat": load_heat,
-        "load_remix_csv": load_remix_csv,
-        "summarize_remixes": summarize_remixes,
-    }
+P.prepare_reportlib()
+from reportlib.cc_lib import analyze_cc  # noqa: E402
+from reportlib.cc_trends import load_cc_trends  # noqa: E402
+from reportlib.charts import setup_font, chart_meme_heat_panel, chart_cc_hashtag_trend  # noqa: E402
+from reportlib.docx_report import build_docx  # noqa: E402
+from reportlib.heat_lib import load_heat  # noqa: E402
+from reportlib.remix_lib import load_remix_csv, summarize_remixes  # noqa: E402
 
 
 def _slug(text: str) -> str:
@@ -136,10 +116,6 @@ def load_pack(path: str) -> dict:
 
 
 def make_charts(chart_dir: Path, font: str, heat_map: dict, cc_trends: dict, pack: dict, report_date: str) -> dict:
-    lib = _load_reportlib()
-    setup_font = lib["setup_font"]
-    chart_meme_heat_panel = lib["chart_meme_heat_panel"]
-    chart_cc_hashtag_trend = lib["chart_cc_hashtag_trend"]
     setup_font(font)
     chart_dir.mkdir(parents=True, exist_ok=True)
     paths = {"meme_heats": {}, "cc_trends": {}}
@@ -200,16 +176,15 @@ def main():
             args.md = str(default_md)
     Path(args.out_docx).parent.mkdir(parents=True, exist_ok=True)
 
-    lib = _load_reportlib()
     remix_summary = {}
     if args.remix_csv:
-        remix_summary = lib["summarize_remixes"](lib["load_remix_csv"](args.remix_csv))
+        remix_summary = summarize_remixes(load_remix_csv(args.remix_csv))
 
     heat_path = args.heat_json or args.heat_csv
-    heat_map = lib["load_heat"](heat_path) if heat_path else {}
+    heat_map = load_heat(heat_path) if heat_path else {}
 
-    cc_analysis = lib["analyze_cc"](args.cc_csv) if args.cc_csv else None
-    cc_trends = lib["load_cc_trends"](args.cc_trends_csv) if args.cc_trends_csv else {}
+    cc_analysis = analyze_cc(args.cc_csv) if args.cc_csv else None
+    cc_trends = load_cc_trends(args.cc_trends_csv) if args.cc_trends_csv else {}
 
     backtest = {}
     if args.backtest_json:
@@ -221,7 +196,7 @@ def main():
             m["backtest_line"] = rec.get("card_line_zh") or default_line
 
     charts = make_charts(Path(args.chart_dir), args.font, heat_map, cc_trends, pack, report_date)
-    path = lib["build_docx_v5"](
+    path = build_docx(
         pack, remix_summary, heat_map, cc_analysis, cc_trends, charts,
         args.out_docx, report_date, backtest=backtest,
     )

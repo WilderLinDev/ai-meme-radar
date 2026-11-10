@@ -131,7 +131,7 @@ TABLES = {
     "cc_hashtag_audience": {
         "name": "CC话题受众",
         "dedupe": "去重键",
-        "description": "话题详情页的受众拆分：年龄、地区、兴趣。当前为空，留给以后的详情抓取。",
+        "description": "话题详情页的受众拆分。年龄写入占比；国家写入人气指数，不是百分比。",
         "fields": [
             {"field_name": "去重键", "type": TEXT},
             {"field_name": "抓取日期", "type": DATE, "property": date_prop()},
@@ -141,6 +141,8 @@ TABLES = {
             {"field_name": "维度", "type": SELECT, "property": sel_prop(AUDIENCE_DIMS)},
             {"field_name": "分组", "type": TEXT},
             {"field_name": "占比", "type": NUMBER, "property": num_prop("0.00")},
+            {"field_name": "人气指数", "type": NUMBER, "property": num_prop("0.00")},
+            {"field_name": "数值说明", "type": TEXT},
             {"field_name": "详情ID", "type": TEXT},
         ],
     },
@@ -442,11 +444,11 @@ def read_csv(path: Path) -> list[dict]:
     return list(csv.DictReader(Path(path).read_text(encoding="utf-8-sig").splitlines()))
 
 
-def load_tag_ids() -> dict[str, str]:
-    path = P.resolve("2026-11-10", "cc-tag-ids.json", "cc_tag_ids_2026-11-10.json")
+def load_tag_ids(as_of: str) -> dict[str, str]:
+    path = P.resolve(as_of, "cc-tag-ids.json", f"cc_tag_ids_{as_of}.json")
     ids = json.loads(path.read_text()) if path.exists() else {}
     # Also harvest IDs from the trend CSV URLs
-    trend = P.resolve("2026-11-10", "cc-hashtag-trends.csv", "cc_hashtag_trends_2026-11-10.csv")
+    trend = P.resolve(as_of, "cc-hashtag-trends.csv", f"cc_hashtag_trends_{as_of}.csv")
     if trend.exists():
         for r in read_csv(trend):
             hid = extract_detail_id(r.get("detail_url") or "")
@@ -472,8 +474,47 @@ def chunk(records, n=MAX_RECORDS):
 
 # ---------- builders ----------
 
+def _combined_top100_rows(path: Path, as_of: str, tag_ids: dict) -> list[dict]:
+    """One file covering every region. Region comes from the row, not the filename."""
+    rows = []
+    for r in read_csv(path):
+        period = period_label(r.get("period_days"))
+        tag = (r.get("hashtag") or "").strip()
+        region = (r.get("region") or "").strip() or "US"
+        rank = parse_number(r.get("rank"))
+        posts, posts_raw = parse_count(r.get("posts"))
+        views, views_raw = parse_count(r.get("views"))
+        ratio = None
+        if posts and views and posts != 0:
+            ratio = round(views / posts, 2)
+        key_tag = tag.lstrip("#").lower()
+        tid = (r.get("detail_id") or "").strip() or tag_ids.get(key_tag, "")
+        period_days = "7" if period == "7日" else "30" if period == "30日" else ""
+        rows.append(fields_clean({
+            "去重键": f"{as_of}|{region}|{period}|{rank}|{tag}",
+            "抓取日期": date_to_ms(as_of),
+            "地区": region if region in REGIONS else None,
+            "筛选行业": "News & Entertainment",
+            "行业": (r.get("industry") or "").strip(),
+            "周期": period,
+            "排名": rank,
+            "话题": tag,
+            "发帖数": posts,
+            "发帖数原文": posts_raw,
+            "播放量": views,
+            "播放量原文": views_raw,
+            "播放/发帖": ratio,
+            "详情ID": tid,
+            "详情链接": detail_url(tid, region, period_days),
+        }))
+    return rows
+
+
 def build_cc_rank_snapshot(as_of: str, tag_ids: dict, prev_ranks: dict | None = None) -> list[dict]:
-    """Load per-region Top 100 CSVs from reports/YYYY-MM/ or the old tiktok_cc dir."""
+    """Prefer the combined Top 100 file. Otherwise read per-region files."""
+    combined = P.resolve(as_of, "cc-top100.csv", f"{as_of}_NewsEnt_top100_all.csv")
+    if combined.exists():
+        return _combined_top100_rows(combined, as_of, tag_ids)
     rows = []
     files = P.per_region_top100_files()
     for path in files:
@@ -533,14 +574,15 @@ def build_cc_hashtag_curve(as_of: str, tag_ids: dict) -> list[dict]:
             as_of = m.group(1)
     rows = []
     for r in read_csv(path):
-        if (r.get("status") or "") != "found":
+        status = (r.get("status") or "found").strip().lower()
+        if status not in ("", "found"):
             continue
         if not r.get("date") or r.get("value") in (None, ""):
             continue
         period = period_label(r.get("period_days"))
         tag = (r.get("hashtag") or "").strip()
-        region = extract_region(r.get("detail_url") or "") or "US"
-        tid = extract_detail_id(r.get("detail_url") or "") or tag_ids.get(tag.lower(), "")
+        region = (r.get("region") or extract_region(r.get("detail_url") or "") or "US").strip()
+        tid = (r.get("detail_id") or "").strip() or extract_detail_id(r.get("detail_url") or "") or tag_ids.get(tag.lstrip("#").lower(), "")
         key = f"{as_of}|{tag}|{region}|{period}|{r['date']}"
         rows.append(fields_clean({
             "去重键": key,
@@ -556,9 +598,62 @@ def build_cc_hashtag_curve(as_of: str, tag_ids: dict) -> list[dict]:
     return rows
 
 
-def build_cc_hashtag_audience(_as_of: str) -> list[dict]:
-    # Intentionally empty until detail captures include audience breakdowns.
-    return []
+def _popularity_index(raw: str):
+    """Parse '1 (800.56)' into (rank, index). Index is not a percentage."""
+    text = (raw or "").strip()
+    index_match = re.search(r"\(([\d.]+)\)", text)
+    index = float(index_match.group(1)) if index_match else None
+    rank_match = re.match(r"(\d+)", text)
+    rank = int(rank_match.group(1)) if rank_match else None
+    return rank, index
+
+
+def build_cc_hashtag_audience(as_of: str, tag_ids: dict | None = None) -> list[dict]:
+    path = P.resolve(as_of, "cc-hashtag-detail.json", f"cc_hashtag_detail_{as_of}.json")
+    if not path.exists():
+        return []
+    details = json.loads(path.read_text(encoding="utf-8"))
+    rows = []
+    for detail in details:
+        tag_raw = (detail.get("hashtag") or "").strip()
+        tag = tag_raw if tag_raw.startswith("#") else f"#{tag_raw}"
+        tag_key = tag.lstrip("#")
+        region = (detail.get("region") or "US").strip()
+        period = period_label(detail.get("period_days"))
+        tid = str(detail.get("detail_id") or (tag_ids or {}).get(tag_key, "") or "")
+        for age in detail.get("age") or []:
+            bucket = age.get("bucket") or ""
+            rows.append(fields_clean({
+                "去重键": f"{as_of}|{tag_key}|{region}|{period}|年龄|{bucket}",
+                "抓取日期": date_to_ms(as_of),
+                "话题": tag,
+                "地区": region if region in REGIONS else None,
+                "周期": period,
+                "维度": "年龄",
+                "分组": bucket,
+                "占比": parse_number(age.get("pct")),
+                "详情ID": tid,
+                "数值说明": "年龄占比（%）",
+            }))
+        for country in detail.get("regions") or []:
+            name = country.get("country") or ""
+            rank, index = _popularity_index(country.get("pct_or_rank") or "")
+            note = "地区人气指数（不是占比）"
+            if rank:
+                note = f"{note}；排名 {rank}"
+            rows.append(fields_clean({
+                "去重键": f"{as_of}|{tag_key}|{region}|{period}|地区|{name}",
+                "抓取日期": date_to_ms(as_of),
+                "话题": tag,
+                "地区": region if region in REGIONS else None,
+                "周期": period,
+                "维度": "地区",
+                "分组": name,
+                "人气指数": index,
+                "详情ID": tid,
+                "数值说明": note,
+            }))
+    return rows
 
 
 def build_meme_daily_tracker() -> list[dict]:
@@ -781,7 +876,7 @@ def build_digest_index() -> list[dict]:
 BUILDERS = {
     "cc_rank_snapshot": lambda as_of, tag_ids: build_cc_rank_snapshot(as_of, tag_ids),
     "cc_hashtag_curve": lambda as_of, tag_ids: build_cc_hashtag_curve(as_of, tag_ids),
-    "cc_hashtag_audience": lambda as_of, tag_ids: build_cc_hashtag_audience(as_of),
+    "cc_hashtag_audience": lambda as_of, tag_ids: build_cc_hashtag_audience(as_of, tag_ids),
     "meme_daily_tracker": lambda as_of, tag_ids: build_meme_daily_tracker(),
     "remix_videos": lambda as_of, tag_ids: build_remix_videos(as_of),
     "backtest": lambda as_of, tag_ids: build_backtest(),
@@ -791,7 +886,7 @@ BUILDERS = {
 
 
 def write_batches(as_of: str, existing_keys: dict[str, set[str]] | None = None) -> dict:
-    tag_ids = load_tag_ids()
+    tag_ids = load_tag_ids(as_of)
     out_dir = BATCH_DIR
     out_dir.mkdir(parents=True, exist_ok=True)
 
@@ -801,16 +896,28 @@ def write_batches(as_of: str, existing_keys: dict[str, set[str]] | None = None) 
     for key, builder in BUILDERS.items():
         records = builder(as_of, tag_ids)
         skipped = 0
-        if existing_keys and key in existing_keys:
+        updates = []
+        known = existing_keys.get(key) if existing_keys else None
+        id_map = known if isinstance(known, dict) else None
+        if known:
             keep = []
             for rec in records:
                 dk = rec.get("去重键")
-                if dk and dk in existing_keys[key]:
+                if dk and dk in known:
+                    if id_map and key in {"meme_daily_tracker", "backtest", "digest_index"}:
+                        updates.append({
+                            "record_id": id_map[dk],
+                            "fields": {k: v for k, v in rec.items() if k != "去重键"},
+                        })
                     skipped += 1
                     continue
                 keep.append(rec)
             records = keep
         payload_records = [{"fields": rec} for rec in records]
+        if updates:
+            dest(f"{key}.update.json").write_text(
+                json.dumps(updates, ensure_ascii=False) + "\n", encoding="utf-8"
+            )
         # write chunked files and a combined file
         combined = {
             "table_key": key,
@@ -873,6 +980,7 @@ def write_batches(as_of: str, existing_keys: dict[str, set[str]] | None = None) 
             "built": combined["count"] + skipped,
             "to_upload": len(payload_records),
             "skipped_existing": skipped,
+            "updates": len(updates),
             "parts": len(chunks),
             "compact_files": compact_files,
         }
@@ -884,15 +992,25 @@ def write_batches(as_of: str, existing_keys: dict[str, set[str]] | None = None) 
     return summary
 
 
-def load_existing_keys(path: Path) -> dict[str, set[str]]:
+def load_existing_keys(path: Path) -> dict:
+    """Accept {table: [去重键, ...]} or {table: {去重键: record_id}}."""
     raw = json.loads(Path(path).read_text(encoding="utf-8"))
-    return {k: set(v) for k, v in raw.items()}
+    out = {}
+    for key, value in raw.items():
+        if isinstance(value, dict):
+            out[key] = {str(dedupe): record_id for dedupe, record_id in value.items()}
+        else:
+            out[key] = set(value)
+    return out
 
 
 def main() -> int:
     p = argparse.ArgumentParser(description="Build Lark Base batches. Off unless --sync-lark.")
     p.add_argument("--as-of", default="2026-11-10")
-    p.add_argument("--existing-keys", help="JSON {table_key: [去重键, ...]}")
+    p.add_argument(
+        "--existing-keys",
+        help="JSON {table: [去重键]} to skip, or {table: {去重键: record_id}} to update tracker, backtest, and digest rows",
+    )
     p.add_argument("--schema-only", action="store_true")
     P.add_lark_flags(p)
     args = p.parse_args()
