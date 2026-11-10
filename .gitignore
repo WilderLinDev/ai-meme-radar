@@ -1,0 +1,18 @@
+.env
+*.env
+!config/.env.example
+.secrets/
+config/.env
+config/settings.yaml
+
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Google Ads 运行产物和访问令牌缓存
+research/output/
+*.access_token
+
+# Lark 批次是同步开启时的中间文件
+data/lark-batches/

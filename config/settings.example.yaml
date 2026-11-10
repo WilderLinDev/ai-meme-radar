@@ -1,0 +1,39 @@
+# Copy to ~/.config/ai-meme-radar/settings.yaml (override the folder with AMR_CONFIG_DIR).
+# Leave this example empty. Do not commit real account ids.
+
+lark:
+  # Master switch. The pipeline still writes reports/ when this is false.
+  enabled: false
+  # Base app_token, the id in the Base URL. Not an OAuth secret.
+  base_app_token: ""
+  # Full Base URL. Optional. Used when you want the link stored with batches.
+  base_url: ""
+  # Wiki node under which the day's Word file is imported.
+  wiki_parent_url: ""
+  # Lark user id for authorizedBy, only if the connector requires it.
+  authorized_by: ""
+  # table key -> Lark table_id. Empty until you create or look up the tables.
+  tables:
+    cc_rank_snapshot: ""
+    cc_hashtag_curve: ""
+    cc_hashtag_audience: ""
+    meme_daily_tracker: ""
+    remix_videos: ""
+    backtest: ""
+    watchlist: ""
+    digest_index: ""
+    default_table: ""
+  # "YYYY-MM-DD|version" -> doc URL. Empty means no digest-index links are written.
+  digest_docs: {}
+
+google_ads:
+  # Ads account customer id (digits). Not an OAuth secret.
+  # Override with GOOGLE_ADS_CUSTOMER_ID.
+  customer_id: ""
+
+paths:
+  # Empty means <repo>/data, <repo>/reports, <repo>/scripts, and the bundled font path.
+  data_dir: ""
+  reports_dir: ""
+  reportlib: ""
+  font: ""
