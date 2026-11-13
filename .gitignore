@@ -2,10 +2,11 @@ __pycache__/
 *.py[cod]
 .venv/
 .pytest_cache/
-
-# local settings never live in the repo
-config/settings.toml
-
-# Lark batches are intermediate files, written only when sync is on
-data/lark-batches/
 .idea/
+
+# local settings and research data never live in the repo
+config/settings.toml
+*.db
+*.db-wal
+*.db-shm
+ai-meme-radar-data/

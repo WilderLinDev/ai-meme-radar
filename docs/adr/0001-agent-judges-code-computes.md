@@ -1,8 +1,9 @@
-# Agent collects and judges, code computes; the meme pack is the only source
+# 1. The agent judges, Python computes
 
-The run is split in two. The AI agent does browser collection (Creative Center, watchlist profiles, remix pages) and the subjective scoring, and writes both as structured files. Code does everything deterministic: validation, normalisation, lifecycle and share-rate maths, tracker, backtest, score-sum checks, and rendering. Code never hardcodes a given day's judgments (the old `build_meme_pack.py` did), and the agent never hand-writes a number code can compute or a Markdown report alongside the docx: both Markdown and Word are rendered from the meme pack, so they cannot disagree.
+Status: accepted (2026-11-13, rebuild)
 
-## Considered Options
+Python owns everything deterministic: API calls and their records, sync, storage, normalization, dedupe, time series, change detection, link suggestions, backtests and report assembly. The agent owns everything that needs understanding: finding trends, reading formats, linking entities, judging demand, competition and feasibility, and the final four attributes with their reasons.
 
-- Agent writes the report directly, code only draws charts (the old way): two sources of truth that drifted apart.
-- Fully scripted collection: Creative Center and TikTok/IG profiles need a logged-in browser and change layout often, so collection stays with the agent.
+The boundary is enforced by the inputs. The agent writes `research.json` and `assessments.json`; Python validates them (schemas, duplicate entities, undefined refs, cited numbers present in the recorded API response) and refuses rather than guesses. Facts in the assessment draft are read-only and ignored on ingest.
+
+Consequence: an agent cannot "adjust" a metric to fit a conclusion, and every number in a report can be traced to an evidence row or an API call.

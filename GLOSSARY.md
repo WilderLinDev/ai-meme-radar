@@ -1,100 +1,107 @@
-# AI meme radar
+# AI Meme Radar 术语表
 
-每天回答一个问题：海外短视频里，今天哪个 AI 视频梗值得做成模板。代码标识符用英文，报告显示用中文；本文件是中英对照的唯一来源。
+每天发现正在扩散的互联网趋势，弄清它背后可复用的内容格式，判断哪些格式值得做成 AI 视频、图片或音频模板。代码标识符用英文，报告用中文；本文件是中英对照的唯一来源。
 
-## 梗
+## 研究对象
 
-**Meme（梗）**:
-一种可被复用、可做成 AI 模板的短视频格式，是唯一的评分单位。
-_Avoid_: trend, format, 话题
+**Trend（趋势）**:
+正在扩散或刚出现的一股内容潮流，如某种 AI 宝宝跳舞视频。可以有早期信号，也可以已经退潮。
+_Avoid_: meme（梗只是趋势的一种）, hashtag, topic
 
-**Meme id（梗 ID）**:
-梗在 Meme registry 里的唯一短名（如 `shoulder-carry`），跨天不变。
-_Avoid_: canonical_id, remix_key, name
+**Format（格式）**:
+趋势背后可复用的内容或交互模式：用户给什么输入、得到什么输出（如「上传一张人像照片，生成跳舞视频」）。一个格式可对应多个趋势。
+_Avoid_: template（模板是产品，格式是模式）
 
-**Meme registry（梗名册）**:
-所有已知梗的身份清单：ID、显示名、别名、关联话题、主热度口径。没登记的梗不存在。
-_Avoid_: aliases, 别名表
+**Template opportunity（模板机会）**:
+可以做成产品的具体机会（如「宝宝跳舞 AI 模板」）。一个机会可利用多个格式。代码里简称 opportunity。
+_Avoid_: idea, product
 
-**CC hashtag（CC 话题）**:
-TikTok Creative Center 上的一个话题标签。它是梗的证据，不是梗本身。
-_Avoid_: tag meme
+**Entity ref（对象引用）**:
+`kind:id` 形式的引用，kind 为 trend / format / opportunity / keyword / site。趋势、格式、机会的 id 为永久不变的 kebab-case。
 
-**Primary heat metric（主热度口径）**:
-登记时为每个梗固定的那条日热度序列，回测只看它。取值 `viralremix_new_videos`、`x_posts`、`cc_index_30d`、`none`。
+**Link（关联）**:
+两个对象之间的一条有向关系（uses、enables、drives、searched_as、targets、competitor、related、variant_of）。只追加事件，不覆盖；当前关联为每条关系的最后一个事件。
 
-**Early signal（早期信号）**:
-刚起步、证据还少的梗；仍是 Meme，只是在日报里归入早期信号部分。
+## 渠道与证据
 
-## 产出
+**Channel（渠道）**:
+四条并行研究渠道之一：social（社交趋势）、search（搜索需求）、product（产品与网站发现）、market（市场数据）。
 
-**Verdict（结论）**:
-对一个梗今天该不该做模板的判断，取值 `make`（做）/ `watch`（观望）/ `skip`（不做）。
-_Avoid_: decision, recommendation, 建议
-
-**Suggested verdict（建议结论）**:
-按总分和窗口分门槛机械推出的结论。
-
-**Override（否决）**:
-Agent 给出的 Verdict 与 Suggested verdict 不同；必须附理由，并在日报里写明。
-
-**Judgment（判断）**:
-Agent 为一个梗写下的主观部分：五项分与理由、窗口、结论、是什么、怎么做、风险。
-_Avoid_: scores file, 打分稿
-
-**Daily decision（每日判断）**:
-某一天对所有候选梗给出的 Verdict 集合，是本项目唯一的核心产出；其余一切都是它的证据或复核。
-_Avoid_: digest, 日报（日报只是它的呈现形式）
-
-**Meme pack（梗包）**:
-某一天 Daily decision 的唯一结构化真源；Markdown 和 Word 日报都只是它的渲染结果。
-_Avoid_: pack v5, base pack, digest json
-
-**Report（日报）**:
-由 Meme pack 渲染出的阅读版本（Markdown / Word），不含任何 Meme pack 里没有的信息。
-_Avoid_: digest
-
-## 评分
-
-**Score（评分）**:
-一个梗当天的 0–100 分，恰好等于五个 Dimension 分之和。
-
-**Dimension（分项）**:
-评分的五个 0–20 分项之一：`heat`（热度）、`trend`（趋势）、`share`（分享率）、`competition`（竞争）、`window`（窗口）。
-_Avoid_: sub-score, 子分
-
-## 证据
-
-**Raw snapshot（原始快照）**:
-某一天从某个来源抓到的原始数据，写入后不再修改。
-_Avoid_: dump, run2, 抓取结果
-
-**Gap（缺口）**:
-当天应该拿到但没拿到的数据，连同原因一起记录；缺口不插值、不当作 0。
-_Avoid_: missing, 空值
+**Evidence（证据）**:
+一条带出处的观察：来源、链接、指标、数值、地区、样本量、指标口径、采集时间、可信度、数字标注，可选引用某次 API 调用。
+_Avoid_: data point, 截图
 
 **Evidence tag（数字标注）**:
-每个数字必须带的可信度标记：【已核实】、【第三方读数】、【估算】。
+每个数字必须带的标记：【已核实】（亲眼读到或接口原样返回）、【第三方读数】（第三方估算或口径不透明）、【估算】（我们推算的）。
 
-## 历史与复核
+**Gap（缺口）**:
+应拿到但没拿到的数据及原因。缺口不插值、不当作 0。
 
-**Tracker（追踪表）**:
-每个梗每天一行的累计历史，用于日环比和长曲线。
-_Avoid_: history, 往期
+**Candidate（候选）**:
+Python 从搜索、产品、市场数据里找到的、与 AI 创作相关的线索，按共享关键词或域名合并成组。候选不是判断。
 
-**Backtest（回测）**:
-在 D+3（自然日）用主热度复核第 D 天的 Verdict 是否站得住。
-_Avoid_: 回查, validation
+## 哥飞数据
 
-**Backtest result（回测结果）**:
-`hit`（对）、`miss`（错）、`pending`（D+3 未到）、`insufficient`（数据不足）四者之一。
+**Ge Fei catalog（哥飞接口目录）**:
+从 `/api/v1/tools` 与 `/api/openapi.json` 实时读取的全部可调用接口，分组 data（数据服务）、composed（聚合分析）、raw（原始数据）、method（方法论与知识库），以及 account。
 
-**Make streak（连续推荐）**:
-同一个梗连续多天被判 `make`；只有首日计入命中率。
+**Data service（数据服务）**:
+四类批次数据：新词（keywords）、新站（launches）、网站发现（hosted）、收入数据（revenue）。不扣 SEO 积分。
 
-**Hit rate（命中率）**:
-`make` 首日推荐中 hit 占 hit + miss 的比例。
+**Sync unit（同步单元）**:
+同步的最小可续传单位：一个批次详情、一个 28 天快照或一份收入报告。状态 done / failed / locked。
 
-**Missed rate（漏判率）**:
-判为 `watch` 或 `skip` 的梗中，D+3 主热度仍明显上升的比例。
-_Avoid_: false negative
+**API call record（调用记录）**:
+每次调用的参数、URL、状态、requestId、实际扣除积分、时间与完整响应 JSON。
+
+**Snapshot（快照）**:
+规范化表里的一行历史记录，只有内容变化时才新增。
+
+## 判断
+
+**Assessment（评估）**:
+Agent 对一个趋势或模板机会某天的判断：四项独立属性、七个维度、理由、假设与待解决问题。每次修改新增一个版本（revision），从不改写。
+_Avoid_: score, verdict
+
+**Lifecycle（生命周期）**: early_signal 早期信号 / emerging 上升期 / proven 已验证 / fading 衰退期。
+
+**Decision（决策）**: build 立即做 / validate 验证 / monitor 观察 / skip 不做。
+
+**Priority（优先级）**: P0 / P1 / P2 / P3。
+
+**Confidence（证据可信度）**: high 高 / medium 中 / low 低。说的是证据够不够，不是机会好不好。
+
+**Dimension（维度）**:
+七个各自独立判断的维度：social_momentum 社交势能、search_demand 搜索需求、audience_participation 用户参与、template_potential 模板潜力、ai_feasibility AI 可行性、competition 竞争强度（高 = 拥挤）、timing 时机。取值 high / medium / low / unknown。没有总分。
+
+**Key opportunity（重点机会）**:
+决策为 build 或 validate，或优先级为 P0 / P1 的模板机会。每个都有深度研究报告。
+
+**Tracked series（跟踪序列）**:
+评估时固定下来、供回测判断的一条序列（某对象某指标某地区的证据序列，或某哥飞关键词的 heat_ratio）。
+
+**Frozen snapshot（冻结快照）**:
+评估入库时保存的事实、跟踪序列与基线值。回测只用它作基线。
+
+**Feedback（人工反馈）**:
+人对决策、优先级、生命周期、关联或研究方向的修改，附理由与作者。只追加；Agent 原始评估保留。
+
+**Effective state（当前状态）**:
+最新评估叠加其后的人工反馈得到的状态，并标明每项来自谁。
+
+## 复核与交付
+
+**Lifecycle backtest（生命周期回测）**:
+7 天后跟踪序列是否按生命周期预期的方向（上升 / 持平 / 下降）变化。
+
+**Decision backtest（决策回测）**:
+14 天后跟踪序列是否支持当时对模板机会的决策。
+
+**Daily report（日报）**:
+本地 Markdown，聚焦变化与行动；未变化的对象只写一行。
+
+**In-depth report（深度报告）**:
+每个重点机会一份的 Markdown 研究报告，按生命周期调整研究重点。
+
+**Lark document（飞书文档）**:
+报告的发布副本。日报每天一份；每个重点机会一份并持续更新。本地 Markdown 为准。

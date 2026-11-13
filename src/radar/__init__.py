@@ -1,1 +1,1 @@
-"""AI meme radar: decide which overseas AI-video meme is worth a template today."""
+"""AI Meme Radar: trend discovery and template-opportunity research for AI creative products."""

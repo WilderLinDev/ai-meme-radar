@@ -1,26 +1,49 @@
-"""Fixed scope, local settings, and where every file lives.
+"""Fixed research scope, local settings, and the persistent data folder.
 
-Settings come from `settings.toml` in the local config folder
-(`$AMR_CONFIG_DIR`, else `~/.config/ai-meme-radar/`). The repo only ships
-`config/settings.example.toml`. Nothing secret is read: Lark writes go through
-the user's connector, and git push uses existing git credentials.
+Settings come from `settings.toml` in the local config folder (`$AMR_CONFIG_DIR`,
+else `~/.config/ai-meme-radar/`). Secrets (the Ge Fei token) live there or in
+`$GEFEI_API_TOKEN`; never in the repo.
+
+All research data lives in one folder outside the Git checkout (`$AMR_DATA_DIR`,
+else `[paths] data_dir`, else `~/ai-meme-radar-data`), so it survives pulls,
+branch switches and code updates:
+
+    ai-meme-radar-data/
+      radar.db                  the only research store (SQLite)
+      reports/daily/            DAY.md
+      reports/opportunities/    <opportunity-id>/DAY.md
+      work/DAY/                 agent inputs for the day (research.json, assessments.json)
+      feedback/                 human feedback files (*.json), applied once each
 """
 from __future__ import annotations
 
 import os
 import tomllib
 from dataclasses import dataclass, field
-from datetime import date
+from datetime import date, datetime
 from pathlib import Path
+from zoneinfo import ZoneInfo
+
+TZ = ZoneInfo("Asia/Shanghai")
 
 # ---- fixed scope (never ask the user to change these) ----
-CC_REGIONS = ("US", "GB", "AU", "CA", "DE", "JP", "KR", "FR")
-CC_PERIODS = (7, 30)
-CC_INDUSTRY = "News & Entertainment"
-PLATFORMS = ("TikTok", "CapCut", "Instagram")
-BACKTEST_HORIZON_DAYS = 3
-MISSED_RISE_THRESHOLD = 0.20  # watch/skip memes rising >= 20% by D+3 count as missed
-SHARE_MIN_N = 5
+PRIMARY_MARKET = "US"
+SUPPLEMENTARY_MARKETS = ("GB", "CA", "AU")
+OBSERVED_MARKETS = ("DE", "JP", "KR", "FR")
+GLOBAL_MARKET = "WORLD"  # early signals
+MARKETS = (PRIMARY_MARKET, *SUPPLEMENTARY_MARKETS, *OBSERVED_MARKETS, GLOBAL_MARKET)
+CC_REGIONS = ("US", "GB", "AU", "CA", "DE", "JP", "KR", "FR")  # Creative Center: NL is not offered
+SOCIAL_PLATFORMS = ("TikTok", "CapCut", "Instagram", "X", "YouTube", "Reddit")  # never Douyin
+
+GEFEI_BASE_URL = "https://seo.web.cafe"
+
+
+def today() -> date:
+    return datetime.now(TZ).date()
+
+
+def now_iso() -> str:
+    return datetime.now(TZ).isoformat(timespec="seconds")
 
 
 def config_dir() -> Path:
@@ -29,23 +52,32 @@ def config_dir() -> Path:
 
 
 @dataclass
+class GefeiSettings:
+    token: str = ""
+    base_url: str = GEFEI_BASE_URL
+    keyword_detail_limit: int = 40  # keyword_detail calls per sync for creative-relevant new keywords
+    refresh_days: int = 3  # batches finished within this many days are re-fetched (content may update)
+
+
+@dataclass
 class LarkSettings:
     enabled: bool = False
-    base_app_token: str = ""
-    base_url: str = ""
-    wiki_parent_url: str = ""
-    authorized_by: str = ""
-    tables: dict[str, str] = field(default_factory=dict)
-    digest_docs: dict[str, str] = field(default_factory=dict)
+    daily_parent: str = ""  # Wiki node token (or folder token) that daily reports go under
+    opportunity_parent: str = ""  # same for in-depth reports; empty = daily_parent
+    identity: str = "user"  # lark-cli --as user|bot
+    cli: str = "lark-cli"
 
 
 @dataclass
 class Settings:
+    gefei: GefeiSettings = field(default_factory=GefeiSettings)
     lark: LarkSettings = field(default_factory=LarkSettings)
     data_dir: str = ""
-    reports_dir: str = ""
-    font: str = ""
-    source: Path | None = None  # the settings.toml that was read, if any
+    source: Path | None = None
+
+    @property
+    def token(self) -> str:
+        return os.environ.get("GEFEI_API_TOKEN", "").strip() or self.gefei.token
 
 
 def load_settings(path: Path | None = None) -> Settings:
@@ -53,100 +85,64 @@ def load_settings(path: Path | None = None) -> Settings:
     if not path.is_file():
         return Settings()
     raw = tomllib.loads(path.read_text(encoding="utf-8"))
-    lark = raw.get("lark") or {}
-    paths = raw.get("paths") or {}
+    g, lk, p = raw.get("gefei") or {}, raw.get("lark") or {}, raw.get("paths") or {}
     return Settings(
-        lark=LarkSettings(
-            enabled=bool(lark.get("enabled", False)),
-            base_app_token=str(lark.get("base_app_token", "")),
-            base_url=str(lark.get("base_url", "")),
-            wiki_parent_url=str(lark.get("wiki_parent_url", "")),
-            authorized_by=str(lark.get("authorized_by", "")),
-            tables={k: str(v) for k, v in (lark.get("tables") or {}).items()},
-            digest_docs={k: str(v) for k, v in (lark.get("digest_docs") or {}).items()},
+        gefei=GefeiSettings(
+            token=str(g.get("token", "")),
+            base_url=str(g.get("base_url", GEFEI_BASE_URL)).rstrip("/"),
+            keyword_detail_limit=int(g.get("keyword_detail_limit", 40)),
+            refresh_days=int(g.get("refresh_days", 3)),
         ),
-        data_dir=str(paths.get("data_dir", "")),
-        reports_dir=str(paths.get("reports_dir", "")),
-        font=str(paths.get("font", "")),
+        lark=LarkSettings(
+            enabled=bool(lk.get("enabled", False)),
+            daily_parent=str(lk.get("daily_parent", "")),
+            opportunity_parent=str(lk.get("opportunity_parent", "")),
+            identity=str(lk.get("identity", "user")),
+            cli=str(lk.get("cli", "lark-cli")),
+        ),
+        data_dir=str(p.get("data_dir", "")),
         source=path,
     )
 
 
 @dataclass
-class Layout:
-    """Every path the pipeline reads or writes. See docs/adr/0002."""
-
+class Paths:
     root: Path
-    data: Path
-    reports: Path
-    font: Path
 
     @classmethod
-    def from_settings(cls, root: Path, settings: Settings) -> "Layout":
-        def pick(value: str, default: Path) -> Path:
-            if not value:
-                return default
-            p = Path(value).expanduser()
-            return p if p.is_absolute() else root / p
-
-        return cls(
-            root=root,
-            data=pick(settings.data_dir, root / "data"),
-            reports=pick(settings.reports_dir, root / "reports"),
-            font=pick(settings.font, root / "assets" / "fonts" / "NotoSansSC-Regular.otf"),
-        )
-
-    # raw evidence, written once per day
-    def raw_dir(self, day: date) -> Path:
-        return self.data / "raw" / day.isoformat()
-
-    def raw_days(self) -> list[date]:
-        base = self.data / "raw"
-        if not base.is_dir():
-            return []
-        out = []
-        for p in base.iterdir():
-            try:
-                out.append(date.fromisoformat(p.name))
-            except ValueError:
-                continue
-        return sorted(out)
-
-    # derived history
-    @property
-    def registry(self) -> Path:
-        return self.data / "memes.csv"
+    def resolve(cls, settings: Settings) -> "Paths":
+        env = os.environ.get("AMR_DATA_DIR", "").strip()
+        raw = env or settings.data_dir
+        return cls(Path(raw).expanduser() if raw else Path.home() / "ai-meme-radar-data")
 
     @property
-    def tracker(self) -> Path:
-        return self.data / "tracker.csv"
+    def db(self) -> Path:
+        return self.root / "radar.db"
+
+    def daily_report(self, day: date) -> Path:
+        return self.root / "reports" / "daily" / f"{day.isoformat()}.md"
+
+    def opportunity_report(self, opp_id: str, day: date) -> Path:
+        return self.root / "reports" / "opportunities" / opp_id / f"{day.isoformat()}.md"
+
+    def work(self, day: date) -> Path:
+        return self.root / "work" / day.isoformat()
 
     @property
-    def backtest_json(self) -> Path:
-        return self.data / "backtest.json"
+    def feedback_inbox(self) -> Path:
+        return self.root / "feedback"
 
-    @property
-    def backtest_csv(self) -> Path:
-        return self.data / "backtest.csv"
+    def ensure(self) -> None:
+        for p in (self.root / "reports" / "daily", self.root / "reports" / "opportunities",
+                  self.root / "work", self.feedback_inbox):
+            p.mkdir(parents=True, exist_ok=True)
 
-    def lark_batches(self, day: date) -> Path:
-        return self.data / "lark-batches" / day.isoformat()
 
-    # deliverables
-    def report_dir(self, day: date) -> Path:
-        return self.reports / day.isoformat()
+REPO = Path(__file__).resolve().parents[2]
 
-    def judgments(self, day: date) -> Path:
-        return self.report_dir(day) / "judgments.json"
 
-    def pack(self, day: date) -> Path:
-        return self.report_dir(day) / "meme-pack.json"
-
-    # static config
-    @property
-    def watchlist(self) -> Path:
-        return self.root / "config" / "watchlist.csv"
-
-    @property
-    def lark_schema(self) -> Path:
-        return self.root / "config" / "lark-base.json"
+def research_terms() -> dict[str, list[str]]:
+    """Creative-relevance vocabulary used to pre-filter Ge Fei data (config/research.toml)."""
+    path = REPO / "config" / "research.toml"
+    raw = tomllib.loads(path.read_text(encoding="utf-8")) if path.is_file() else {}
+    return {k: [str(t).lower() for t in v] for k, v in raw.items() if isinstance(v, list)}

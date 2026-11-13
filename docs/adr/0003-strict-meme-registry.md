@@ -1,3 +1,0 @@
-# Meme identity comes only from an explicit registry, with no fuzzy matching
-
-Every meme must be registered in `data/memes.csv` (id, names, aliases, linked CC hashtags, primary heat metric) before any snapshot or judgment can refer to it; code rejects unknown ids instead of guessing. This replaces substring alias matching (`"shoulder"` → Shoulder Carry) and a hardcoded per-name primary-metric table, both of which silently merged or split memes and made the tracker and backtest unreliable. The primary heat metric is fixed at registration; changing it is an explicit registry edit, and the backtest always uses the metric in force on the recommendation day. CC hashtags are evidence linked to a meme, never scored on their own.

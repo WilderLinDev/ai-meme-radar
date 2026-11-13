@@ -1,0 +1,24 @@
+# Vocabulary for pre-filtering Ge Fei data down to the AI creative space.
+# Matching is case-insensitive substring on keyword text, site titles, purposes and categories.
+# This only decides what reaches the candidate list; the agent decides what matters.
+
+creative_terms = [
+  "ai video", "ai image", "ai photo", "ai art", "ai voice", "ai song", "ai music", "ai cover",
+  "ai dance", "ai baby", "ai pet", "ai cat", "ai dog", "ai hug", "ai kiss", "ai filter",
+  "ai effect", "ai avatar", "ai anime", "ai cartoon", "ai headshot", "ai portrait", "ai meme",
+  "ai template", "ai generator", "ai editor", "ai animation", "ai talking", "ai lip sync",
+  "face swap", "faceswap", "photo to video", "image to video", "text to video", "text to image",
+  "image generator", "video generator", "photo editor", "video editor", "animate", "animation",
+  "transform", "transformation", "dance", "meme", "trend", "template", "capcut", "filter",
+  "effect", "avatar", "anime", "cartoon", "sticker", "emoji", "remix", "lip sync", "voice changer",
+  "song", "music", "cover", "selfie", "figurine", "action figure", "ghibli", "pixar", "3d",
+  "upscale", "colorize", "restore", "headshot", "tattoo", "hairstyle", "outfit", "makeover",
+  "baby", "pet", "kiss", "hug", "old photo", "veo", "sora", "kling", "hailuo", "seedance",
+  "pixverse", "runway", "midjourney", "nano banana", "flux", "suno", "udio", "elevenlabs",
+]
+
+# Categories in Ge Fei's own labels that count as creative even without a term match.
+creative_categories = [
+  "ai", "image", "video", "audio", "music", "design", "photo", "creative", "entertainment",
+  "图片", "图像", "视频", "音频", "音乐", "设计", "创作", "娱乐", "ai工具",
+]

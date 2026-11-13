@@ -1,26 +1,18 @@
 # Copy to ~/.config/ai-meme-radar/settings.toml ($AMR_CONFIG_DIR overrides the folder).
-# Keep this example empty. Do not commit real ids. Nothing here is a secret.
+# Never commit the real file. The token may instead come from $GEFEI_API_TOKEN.
+
+[gefei]
+token = ""                    # wc_mcp_… from https://seo.web.cafe/api/ (secret)
+base_url = "https://seo.web.cafe"
+refresh_days = 3              # batches finished this recently are re-fetched (contents may still change)
+keyword_detail_limit = 40     # keyword_detail calls per sync, creative-relevant batch keywords only
 
 [lark]
-enabled = false          # master switch; reports are written either way
-base_app_token = ""      # the id in the Base URL
-base_url = ""
-wiki_parent_url = ""     # Wiki node the day's .docx is imported under
-authorized_by = ""       # only if the connector asks for it
+enabled = false               # publishing switch; local reports are written either way
+daily_parent = ""             # Wiki node (or folder) token daily reports are created under
+opportunity_parent = ""       # same for in-depth reports; empty = daily_parent
+identity = "user"             # lark-cli --as user|bot
+cli = "lark-cli"
 
-[lark.tables]            # table key (config/lark-base.json) -> Lark table_id
-cc_rank_snapshot = ""
-cc_hashtag_curve = ""
-cc_hashtag_audience = ""
-meme_daily_tracker = ""
-remix_videos = ""
-backtest = ""
-watchlist = ""
-digest_index = ""
-
-[lark.digest_docs]       # "YYYY-MM-DD" = "imported doc URL"
-
-[paths]                  # empty = <repo>/data, <repo>/reports, assets/fonts/NotoSansSC-Regular.otf
-data_dir = ""
-reports_dir = ""
-font = ""
+[paths]
+data_dir = ""                 # empty = ~/ai-meme-radar-data ($AMR_DATA_DIR overrides)

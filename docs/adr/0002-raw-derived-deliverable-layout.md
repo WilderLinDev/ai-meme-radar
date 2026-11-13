@@ -1,3 +1,0 @@
-# Split raw evidence, derived history and deliverables into separate trees
-
-Files are grouped by what they are, not by month: `data/raw/YYYY-MM-DD/` holds that day's raw snapshots (write once, never edited), `data/` holds cumulative derived tables (tracker, backtest), and `reports/YYYY-MM-DD/` holds only that day's deliverables (the agent's `judgments.json`, and the meme pack, Markdown, Word and charts built from it). This replaces the earlier flat `reports/YYYY-MM/` folder where all three kinds were mixed under date prefixes. Legacy filenames are no longer recognised; the 2026-11-10 sample is migrated once into the new layout as a test fixture.

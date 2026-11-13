@@ -1,18 +1,13 @@
 [project]
 name = "ai-meme-radar"
-version = "2.0.0"
-description = "Daily overseas AI-meme video radar: decide which meme is worth an AI template today."
+version = "3.0.0"
+description = "Trend discovery, market research and template-opportunity assessment for AI creative products."
 readme = "README.md"
 license = { text = "MIT" }
 requires-python = ">=3.12"
 dependencies = [
   "pydantic>=2.7",
-  "python-docx>=1.1",
-  "matplotlib>=3.8",
 ]
-
-[project.scripts]
-radar = "radar.cli:main"
 
 [dependency-groups]
 dev = ["pytest>=8"]

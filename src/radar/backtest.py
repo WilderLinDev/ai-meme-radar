@@ -1,167 +1,131 @@
-"""D+3 backtest of every verdict in the tracker. Rules: docs/scoring.md.
+"""Two independent backtests, both judged against what was frozen at assessment time.
 
-- make: hit if the primary heat on D+3 is strictly above the D baseline, else miss.
-  Only the first day of a make streak counts toward the hit rate.
-- watch / skip: miss (a missed meme) if D+3 is at least 20% above baseline, else hit.
-- pending: D+3 is after the as-of date. insufficient: no series, no baseline, or no D+3 point.
+1. lifecycle: did the tracked series move the way the assessed lifecycle
+   implied (rising / holding / falling) over LIFECYCLE_HORIZON days?
+2. decision: for opportunities, was the build / validate / monitor / skip call
+   borne out by the tracked series over DECISION_HORIZON days?
+
+The baseline is the value frozen in the assessment snapshot, never a value
+looked up later. The outcome is the first observation at or after day + horizon
+(within a grace window). The final revision of each assessment day is judged;
+human feedback does not rewrite the agent's record, it is reported beside it.
 """
 from __future__ import annotations
 
 import json
+import sqlite3
 from datetime import date, timedelta
-from pathlib import Path
-from typing import Literal
 
-from pydantic import BaseModel
+from . import db
+from .config import now_iso
+from .research import metrics
 
-from .analysis.primary import value_on
-from .config import BACKTEST_HORIZON_DAYS, MISSED_RISE_THRESHOLD
-from .csvio import write_rows
-from .judgments import VERDICT_ZH
-from .raw import History
-from .registry import Registry
-from .tracker import report_dates
-
-Result = Literal["hit", "miss", "pending", "insufficient"]
-RESULT_ZH = {
-    "make": {"hit": "对", "miss": "错", "pending": "待定", "insufficient": "数据不足"},
-    "watch": {"hit": "未漏判", "miss": "漏判", "pending": "待定", "insufficient": "数据不足"},
-    "skip": {"hit": "未漏判", "miss": "漏判", "pending": "待定", "insufficient": "数据不足"},
-}
+LIFECYCLE_HORIZON = 7
+DECISION_HORIZON = 14
+GRACE = 7  # days after the horizon an outcome may still be observed
+HOLD_FLOOR = -0.15
+SUPPORT_FLOOR = -0.10
+MISSED_RISE = 0.30
 
 
-class Evaluation(BaseModel):
-    recommend_date: date
-    meme_id: str
-    name: str
-    verdict: str
-    total: int
-    primary_metric: str
-    baseline_date: date | None
-    baseline_value: float | None
-    d3_date: date
-    d3_value: float | None
-    result: Result
-    counted: bool  # make only: first day of a streak
-    note: str
-
-    @property
-    def result_zh(self) -> str:
-        return RESULT_ZH[self.verdict][self.result]
-
-    def line_zh(self) -> str:
-        head = f"{self.recommend_date:%m-%d} 判{VERDICT_ZH[self.verdict]}，D+3（{self.d3_date:%m-%d}）{self.result_zh}"
-        return f"{head}：{self.note}" if self.note else head
+def _judged(conn: sqlite3.Connection) -> list[dict]:
+    """Final revision per (day, entity)."""
+    return db.rows(conn, "SELECT a.* FROM assessments a JOIN (SELECT day, entity, MAX(revision) AS rev FROM assessments"
+                         " GROUP BY day, entity) m ON a.day=m.day AND a.entity=m.entity AND a.revision=m.rev"
+                         " ORDER BY a.day, a.entity")
 
 
-class Summary(BaseModel):
-    as_of: date
-    horizon_days: int = BACKTEST_HORIZON_DAYS
-    missed_threshold: float = MISSED_RISE_THRESHOLD
-    make_hit: int = 0
-    make_miss: int = 0
-    make_pending: int = 0
-    make_insufficient: int = 0
-    make_streak_repeats: int = 0
-    other_hit: int = 0
-    other_miss: int = 0
-    other_pending: int = 0
-    other_insufficient: int = 0
-
-    @property
-    def hit_rate(self) -> float | None:
-        n = self.make_hit + self.make_miss
-        return self.make_hit / n if n else None
-
-    @property
-    def missed_rate(self) -> float | None:
-        n = self.other_hit + self.other_miss
-        return self.other_miss / n if n else None
-
-    def text_zh(self) -> str:
-        hr = f"{self.hit_rate * 100:.0f}%" if self.hit_rate is not None else "暂无"
-        mr = f"{self.missed_rate * 100:.0f}%" if self.missed_rate is not None else "暂无"
-        return (f"截至 {self.as_of}，「做」命中率 {hr}（对 {self.make_hit} / 错 {self.make_miss}，"
-                f"待定 {self.make_pending}，数据不足 {self.make_insufficient}，连续推荐不重复计 {self.make_streak_repeats}）。"
-                f"观望/不做漏判率 {mr}（漏判 {self.other_miss} / 未漏判 {self.other_hit}，"
-                f"待定 {self.other_pending}，数据不足 {self.other_insufficient}）。")
+def _outcome_point(conn, tracked: dict, entity: str, day: date, horizon: int) -> metrics.Point | None:
+    due = (day + timedelta(days=horizon)).isoformat()
+    last = (day + timedelta(days=horizon + GRACE)).isoformat()
+    for p in metrics.tracked_points(conn, tracked, entity):
+        if due <= p.at[:10] <= last:
+            return p
+    return None
 
 
-def _f(v: str) -> float | None:
-    try:
-        return float(v)
-    except (TypeError, ValueError):
-        return None
+def lifecycle_outcome(expected: str, change: float) -> str:
+    if expected == "rising":
+        return "hit" if change >= metrics.RISE else "miss"
+    if expected == "falling":
+        return "hit" if change <= -metrics.RISE else "miss"
+    return "hit" if change > HOLD_FLOOR else "miss"
 
 
-def evaluate(rows: list[dict], registry: Registry, hist: History, as_of: date) -> tuple[list[Evaluation], Summary]:
-    dates = report_dates(rows)
-    by_key = {(r["date"], r["meme_id"]): r for r in rows}
-    out: list[Evaluation] = []
-    s = Summary(as_of=as_of)
-    for r in sorted(rows, key=lambda r: (r["date"], r["meme_id"])):
-        day = date.fromisoformat(r["date"])
-        d3 = day + timedelta(days=BACKTEST_HORIZON_DAYS)
-        verdict, metric = r["verdict"], r["primary_metric"]
-        base_date = date.fromisoformat(r["primary_date"]) if r.get("primary_date") else None
-        base = _f(r.get("primary_value"))
-        idx = dates.index(r["date"])
-        prev = by_key.get((dates[idx - 1], r["meme_id"])) if idx > 0 else None
-        counted = verdict == "make" and not (prev and prev["verdict"] == "make")
+def decision_outcome(decision: str, change: float) -> str:
+    if decision in ("build", "validate"):
+        return "supported" if change >= SUPPORT_FLOOR else "not_supported"
+    if decision == "monitor":
+        return "missed_upside" if change >= MISSED_RISE else "ok"
+    return "missed" if change >= MISSED_RISE else "correct"
 
-        d3_value = None
-        if d3 > as_of:
-            result, note = "pending", ""
-        elif metric == "none" or r["meme_id"] not in registry:
-            result, note = "insufficient", "没有可回测的全站日序列"
-        elif base_date is None or base is None:
-            result, note = "insufficient", "推荐日没有主热度基线"
-        else:
-            meme = registry[r["meme_id"]].model_copy(update={"primary_metric": metric})
-            pair = value_on(meme, hist, base_date, d3)
-            if pair is None:
-                result, note = "insufficient", f"没有 {d3:%m-%d} 的完整主热度点"
-            else:
-                base, d3_value = pair
-                if verdict == "make":
-                    result = "hit" if d3_value > base else "miss"
+
+def evaluate(conn: sqlite3.Connection, today: date) -> dict:
+    counts: dict[str, dict[str, int]] = {"lifecycle": {}, "decision": {}}
+    with db.tx(conn):
+        for a in _judged(conn):
+            body = json.loads(a["body_json"])
+            snap = json.loads(a["snapshot_json"])
+            day = date.fromisoformat(a["day"])
+            systems = [("lifecycle", LIFECYCLE_HORIZON)]
+            if a["entity"].startswith("opportunity:"):
+                systems.append(("decision", DECISION_HORIZON))
+            for system, horizon in systems:
+                tracked, base = snap.get("tracked"), snap.get("baseline")
+                row = {"system": system, "assessment_id": a["id"], "horizon_days": horizon,
+                       "series_json": db.dumps(tracked), "baseline_value": base["value"] if base else None,
+                       "baseline_at": base["at"] if base else None, "outcome_value": None, "outcome_at": None,
+                       "change_pct": None, "evaluated_at": now_iso()}
+                if not tracked or not base:
+                    row |= {"outcome": "unscorable", "detail": "no tracked series frozen at assessment time"}
+                elif base["value"] == 0:
+                    row |= {"outcome": "unscorable", "detail": "baseline is 0; change is undefined"}
                 else:
-                    result = "miss" if base > 0 and d3_value >= base * (1 + MISSED_RISE_THRESHOLD) else "hit"
-                note = f"基线 {base_date:%m-%d} 的 {base:g} → {d3:%m-%d} 的 {d3_value:g}"
-
-        ev = Evaluation(recommend_date=day, meme_id=r["meme_id"], name=r["name"], verdict=verdict,
-                        total=int(r["total"]), primary_metric=metric, baseline_date=base_date,
-                        baseline_value=base, d3_date=d3, d3_value=d3_value, result=result,
-                        counted=counted, note=note)
-        out.append(ev)
-        if verdict == "make":
-            if not counted:
-                s.make_streak_repeats += 1
-            else:
-                setattr(s, f"make_{result}", getattr(s, f"make_{result}") + 1)
-        else:
-            setattr(s, f"other_{result}", getattr(s, f"other_{result}") + 1)
-    return out, s
-
-
-def latest_line(evals: list[Evaluation], meme_id: str, before: date) -> str:
-    """The most recent settled evaluation of a meme from an earlier report, for its card."""
-    past = [e for e in evals if e.meme_id == meme_id and e.recommend_date < before]
-    settled = [e for e in past if e.result in ("hit", "miss")]
-    pick = max(settled or past, key=lambda e: e.recommend_date, default=None)
-    return pick.line_zh() if pick else "首次出现，暂无回测"
-
-
-CSV_COLUMNS = list(Evaluation.model_fields)
+                    p = _outcome_point(conn, tracked, a["entity"], day, horizon)
+                    if p is None:
+                        expired = today > day + timedelta(days=horizon + GRACE)
+                        row |= {"outcome": "no_data" if expired else "pending",
+                                "detail": "no observation in the outcome window" if expired else
+                                f"due {(day + timedelta(days=horizon)).isoformat()}"}
+                    else:
+                        change = (p.value - base["value"]) / abs(base["value"])
+                        row |= {"outcome_value": p.value, "outcome_at": p.at, "change_pct": change}
+                        if system == "lifecycle":
+                            exp = body.get("expected_direction") or "holding"
+                            row |= {"outcome": lifecycle_outcome(exp, change),
+                                    "detail": f"{a['lifecycle']} expected {exp}"}
+                        else:
+                            row |= {"outcome": decision_outcome(a["decision"], change),
+                                    "detail": f"decision {a['decision']}"}
+                conn.execute("INSERT OR REPLACE INTO backtest_results (system, assessment_id, horizon_days,"
+                             " series_json, baseline_value, baseline_at, outcome_value, outcome_at, change_pct,"
+                             " outcome, detail, evaluated_at) VALUES (:system, :assessment_id, :horizon_days,"
+                             " :series_json, :baseline_value, :baseline_at, :outcome_value, :outcome_at,"
+                             " :change_pct, :outcome, :detail, :evaluated_at)", row)
+                c = counts[system]
+                c[row["outcome"]] = c.get(row["outcome"], 0) + 1
+    return counts
 
 
-def write(evals: list[Evaluation], summary: Summary, json_path: Path, csv_path: Path) -> None:
-    json_path.parent.mkdir(parents=True, exist_ok=True)
-    payload = {
-        "summary": summary.model_dump(mode="json") | {"hit_rate": summary.hit_rate,
-                                                      "missed_rate": summary.missed_rate,
-                                                      "text_zh": summary.text_zh()},
-        "evaluations": [e.model_dump(mode="json") for e in evals],
-    }
-    json_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
-    write_rows(csv_path, CSV_COLUMNS, [e.model_dump(mode="json") for e in evals])
+GOOD = {"lifecycle": {"hit"}, "decision": {"supported", "ok", "correct"}}
+BAD = {"lifecycle": {"miss"}, "decision": {"not_supported", "missed_upside", "missed"}}
+
+
+def summary(conn: sqlite3.Connection) -> dict:
+    out = {}
+    for system in ("lifecycle", "decision"):
+        rows = db.rows(conn, "SELECT outcome, COUNT(*) AS n FROM backtest_results WHERE system=? GROUP BY outcome",
+                       (system,))
+        c = {r["outcome"]: r["n"] for r in rows}
+        good = sum(v for k, v in c.items() if k in GOOD[system])
+        bad = sum(v for k, v in c.items() if k in BAD[system])
+        out[system] = {"counts": c, "scored": good + bad, "good": good,
+                       "rate": good / (good + bad) if good + bad else None}
+    return out
+
+
+def resolved_on(conn: sqlite3.Connection, day: date) -> list[dict]:
+    """Results whose outcome observation fell on `day` (newly scored)."""
+    return db.rows(conn, "SELECT b.*, a.entity, a.day AS assessed_day, a.lifecycle, a.decision FROM backtest_results b"
+                         " JOIN assessments a ON a.id=b.assessment_id WHERE substr(b.outcome_at,1,10)=?"
+                         " ORDER BY b.system, a.entity", (day.isoformat(),))

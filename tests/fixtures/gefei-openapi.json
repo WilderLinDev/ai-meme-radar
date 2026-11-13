@@ -1,0 +1,885 @@
+{
+ "openapi": "3.1.0",
+ "info": {
+  "title": "哥飞 SEO 工具箱 API",
+  "version": "1.0",
+  "description": "关键词、域名、网站流量、SERP、页面体检等 SEO 数据与分析接口。SEO 工具调用只扣积分余额（购买的积分与邀请奖励的积分网站与 API 通用，每日赠送额度仅限网站内使用）。数据服务沿用 new.web.cafe 解锁规则，不额外扣除 SEO 积分。文档：https://seo.web.cafe/api/"
+ },
+ "servers": [
+  {
+   "url": "https://seo.web.cafe"
+  }
+ ],
+ "paths": {
+  "/api/v1/keyword_difficulty": {
+   "post": {
+    "operationId": "keyword_difficulty",
+    "summary": "关键词难度（哥飞版 KD）",
+    "tags": [
+     "哥飞组装"
+    ]
+   }
+  },
+  "/api/v1/domain_overview": {
+   "post": {
+    "operationId": "domain_overview",
+    "summary": "网站流量概览",
+    "tags": [
+     "哥飞组装"
+    ]
+   }
+  },
+  "/api/v1/website_worth": {
+   "post": {
+    "operationId": "website_worth",
+    "summary": "网站估值",
+    "tags": [
+     "哥飞组装"
+    ]
+   }
+  },
+  "/api/v1/backlink_value": {
+   "post": {
+    "operationId": "backlink_value",
+    "summary": "外链价值评估",
+    "tags": [
+     "哥飞组装"
+    ]
+   }
+  },
+  "/api/v1/serp_review": {
+   "post": {
+    "operationId": "serp_review",
+    "summary": "SERP 排名解密",
+    "tags": [
+     "哥飞组装"
+    ]
+   }
+  },
+  "/api/v1/page_coach": {
+   "post": {
+    "operationId": "page_coach",
+    "summary": "页面军师",
+    "tags": [
+     "哥飞组装"
+    ]
+   }
+  },
+  "/api/v1/onpage_audit": {
+   "post": {
+    "operationId": "onpage_audit",
+    "summary": "On Page SEO 体检",
+    "tags": [
+     "哥飞组装"
+    ]
+   }
+  },
+  "/api/v1/translate_demand": {
+   "post": {
+    "operationId": "translate_demand",
+    "summary": "需求翻译器",
+    "tags": [
+     "哥飞组装"
+    ]
+   }
+  },
+  "/api/v1/adsense_audit": {
+   "post": {
+    "operationId": "adsense_audit",
+    "summary": "AdSense 过审预检",
+    "tags": [
+     "哥飞组装"
+    ]
+   }
+  },
+  "/api/v1/brand_naming": {
+   "post": {
+    "operationId": "brand_naming",
+    "summary": "网站起名",
+    "tags": [
+     "哥飞组装"
+    ]
+   }
+  },
+  "/api/v1/domain_review": {
+   "post": {
+    "operationId": "domain_review",
+    "summary": "域名精评",
+    "tags": [
+     "哥飞组装"
+    ]
+   }
+  },
+  "/api/v1/bulk_domain_scan": {
+   "post": {
+    "operationId": "bulk_domain_scan",
+    "summary": "域名批量生成并查注册",
+    "tags": [
+     "哥飞组装"
+    ]
+   }
+  },
+  "/api/v1/search_known_sites": {
+   "post": {
+    "operationId": "search_known_sites",
+    "summary": "站点库检索",
+    "tags": [
+     "哥飞组装"
+    ]
+   }
+  },
+  "/api/v1/search_known_keywords": {
+   "post": {
+    "operationId": "search_known_keywords",
+    "summary": "关键词库检索",
+    "tags": [
+     "哥飞组装"
+    ]
+   }
+  },
+  "/api/v1/stripe_checkout_referrals": {
+   "post": {
+    "operationId": "stripe_checkout_referrals",
+    "summary": "Stripe 引荐流量榜",
+    "tags": [
+     "哥飞组装"
+    ]
+   }
+  },
+  "/api/v1/find_link_prospects": {
+   "post": {
+    "operationId": "find_link_prospects",
+    "summary": "外链资源筛选",
+    "tags": [
+     "哥飞组装"
+    ]
+   }
+  },
+  "/api/v1/load_guide": {
+   "post": {
+    "operationId": "load_guide",
+    "summary": "方法论手册",
+    "tags": [
+     "方法论与知识库"
+    ]
+   }
+  },
+  "/api/v1/knowledge_ask": {
+   "post": {
+    "operationId": "knowledge_ask",
+    "summary": "问哥飞",
+    "tags": [
+     "方法论与知识库"
+    ]
+   }
+  },
+  "/api/v1/knowledge_search": {
+   "post": {
+    "operationId": "knowledge_search",
+    "summary": "哥飞知识库检索",
+    "tags": [
+     "方法论与知识库"
+    ]
+   }
+  },
+  "/api/v1/knowledge_read": {
+   "post": {
+    "operationId": "knowledge_read",
+    "summary": "哥飞知识库阅读",
+    "tags": [
+     "方法论与知识库"
+    ]
+   }
+  },
+  "/api/v1/serp": {
+   "post": {
+    "operationId": "serp",
+    "summary": "谷歌搜索结果",
+    "tags": [
+     "原始数据"
+    ]
+   }
+  },
+  "/api/v1/domain_dr": {
+   "post": {
+    "operationId": "domain_dr",
+    "summary": "Ahrefs DR（域名权重）",
+    "tags": [
+     "原始数据"
+    ]
+   }
+  },
+  "/api/v1/domain_traffic": {
+   "post": {
+    "operationId": "domain_traffic",
+    "summary": "网站流量数据",
+    "tags": [
+     "原始数据"
+    ]
+   }
+  },
+  "/api/v1/domain_availability": {
+   "post": {
+    "operationId": "domain_availability",
+    "summary": "域名注册状态",
+    "tags": [
+     "原始数据"
+    ]
+   }
+  },
+  "/api/v1/lookup_keywords": {
+   "post": {
+    "operationId": "lookup_keywords",
+    "summary": "关键词库存数据",
+    "tags": [
+     "原始数据"
+    ]
+   }
+  },
+  "/api/v1/lookup_domains": {
+   "post": {
+    "operationId": "lookup_domains",
+    "summary": "域名库存数据",
+    "tags": [
+     "原始数据"
+    ]
+   }
+  },
+  "/api/v1/keyword_volume": {
+   "post": {
+    "operationId": "keyword_volume",
+    "summary": "关键词搜索量",
+    "tags": [
+     "原始数据"
+    ]
+   }
+  },
+  "/api/v1/google_trends": {
+   "post": {
+    "operationId": "google_trends",
+    "summary": "谷歌趋势",
+    "tags": [
+     "原始数据"
+    ]
+   }
+  },
+  "/api/v1/trends_rising": {
+   "post": {
+    "operationId": "trends_rising",
+    "summary": "谷歌趋势找新词",
+    "tags": [
+     "原始数据"
+    ]
+   }
+  },
+  "/api/v1/keyword_ideas": {
+   "post": {
+    "operationId": "keyword_ideas",
+    "summary": "拓词",
+    "tags": [
+     "原始数据"
+    ]
+   }
+  },
+  "/api/v1/site_keywords": {
+   "post": {
+    "operationId": "site_keywords",
+    "summary": "站点出词",
+    "tags": [
+     "原始数据"
+    ]
+   }
+  },
+  "/api/v1/site_history": {
+   "post": {
+    "operationId": "site_history",
+    "summary": "站点搜索流量历史",
+    "tags": [
+     "原始数据"
+    ]
+   }
+  },
+  "/api/v1/bulk_keyword_difficulty": {
+   "post": {
+    "operationId": "bulk_keyword_difficulty",
+    "summary": "批量难度预筛",
+    "tags": [
+     "原始数据"
+    ]
+   }
+  },
+  "/api/v1/search_intent": {
+   "post": {
+    "operationId": "search_intent",
+    "summary": "搜索意图分类",
+    "tags": [
+     "原始数据"
+    ]
+   }
+  },
+  "/api/v1/domain_timeline": {
+   "post": {
+    "operationId": "domain_timeline",
+    "summary": "域名历史快照时间线",
+    "tags": [
+     "原始数据"
+    ]
+   }
+  },
+  "/api/v1/fetch_url": {
+   "post": {
+    "operationId": "fetch_url",
+    "summary": "抓取网页",
+    "tags": [
+     "原始数据"
+    ]
+   }
+  },
+  "/api/v1/keywords/batches": {
+   "get": {
+    "operationId": "keyword_batches",
+    "summary": "新词批次列表",
+    "tags": [
+     "数据服务"
+    ],
+    "parameters": [
+     {
+      "name": "page",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "integer",
+       "minimum": 1,
+       "default": 1,
+       "description": "页码，默认 1。"
+      }
+     }
+    ]
+   }
+  },
+  "/api/v1/keywords/batches/{id}": {
+   "get": {
+    "operationId": "keyword_batch",
+    "summary": "批次全部关键词",
+    "tags": [
+     "数据服务"
+    ],
+    "parameters": [
+     {
+      "name": "id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "description": "批次 ID，取批次列表返回的 id。"
+      }
+     }
+    ]
+   }
+  },
+  "/api/v1/launches/batches": {
+   "get": {
+    "operationId": "launch_batches",
+    "summary": "新站批次列表",
+    "tags": [
+     "数据服务"
+    ],
+    "parameters": [
+     {
+      "name": "page",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "integer",
+       "minimum": 1,
+       "default": 1,
+       "description": "页码，默认 1。"
+      }
+     }
+    ]
+   }
+  },
+  "/api/v1/launches/batches/{id}": {
+   "get": {
+    "operationId": "launch_batch",
+    "summary": "新站批次全部项目",
+    "tags": [
+     "数据服务"
+    ],
+    "parameters": [
+     {
+      "name": "id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "description": "批次 ID，取批次列表返回的 id。"
+      }
+     }
+    ]
+   }
+  },
+  "/api/v1/hosted/batches": {
+   "get": {
+    "operationId": "hosted_batches",
+    "summary": "网站发现批次列表",
+    "tags": [
+     "数据服务"
+    ],
+    "parameters": [
+     {
+      "name": "page",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "integer",
+       "minimum": 1,
+       "default": 1,
+       "description": "页码，默认 1。"
+      }
+     }
+    ]
+   }
+  },
+  "/api/v1/hosted/batches/{id}": {
+   "get": {
+    "operationId": "hosted_batch",
+    "summary": "网站发现批次详情",
+    "tags": [
+     "数据服务"
+    ],
+    "parameters": [
+     {
+      "name": "id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "description": "批次 ID，取批次列表返回的 id。"
+      }
+     },
+     {
+      "name": "28d",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "string",
+       "format": "date",
+       "description": "可选，快照采集日期 YYYY-MM-DD，取自默认详情的 data.reports_28d[].date_28d；须属于该批次且已获授权。"
+      }
+     }
+    ]
+   }
+  },
+  "/api/v2/checkouts/months": {
+   "get": {
+    "operationId": "income_months_v2",
+    "summary": "收入数据月份列表",
+    "tags": [
+     "数据服务"
+    ],
+    "parameters": [
+     {
+      "name": "page",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "integer",
+       "minimum": 1,
+       "maximum": 300239975158033,
+       "default": 1,
+       "description": "页码，默认 1。"
+      }
+     }
+    ]
+   }
+  },
+  "/api/v2/checkouts/months/{month}": {
+   "get": {
+    "operationId": "income_month_v2",
+    "summary": "收入数据月份详情",
+    "tags": [
+     "数据服务"
+    ],
+    "parameters": [
+     {
+      "name": "page",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "integer",
+       "minimum": 1,
+       "maximum": 180143985094819,
+       "default": 1,
+       "description": "页码，默认1，每页最多50个网站；递增至 has_more=false。"
+      }
+     },
+     {
+      "name": "month",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "pattern": "^\\d{4}-(0[1-9]|1[0-2])$",
+       "description": "报告月份 YYYY-MM。"
+      }
+     },
+     {
+      "name": "28d",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "string",
+       "format": "date",
+       "description": "可选，该月份内的快照采集日期 YYYY-MM-DD；省略时仅查询整月报告。"
+      }
+     }
+    ]
+   }
+  },
+  "/api/v1/keywords": {
+   "get": {
+    "operationId": "keyword_search",
+    "summary": "关键词搜索",
+    "tags": [
+     "数据服务"
+    ],
+    "parameters": [
+     {
+      "name": "q",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "string",
+       "maxLength": 60,
+       "description": "关键词，最多 60 字符；留空不筛选。"
+      }
+     },
+     {
+      "name": "tab",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "string",
+       "enum": [
+        "new",
+        "resurgence",
+        "evergreen",
+        "game",
+        "all",
+        "skip"
+       ],
+       "description": "分类。new：新词；resurgence：二次爆火；evergreen：长期大词；game：游戏；all：全部（排除不值得做）；skip：不值得做。默认不筛选，包含不值得做。"
+      }
+     },
+     {
+      "name": "page",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "integer",
+       "minimum": 1,
+       "maximum": 180143985094819,
+       "default": 1,
+       "description": "页码，默认 1；超出末页返回空列表。"
+      }
+     }
+    ]
+   }
+  },
+  "/api/v1/keywords/word/{slug}": {
+   "get": {
+    "operationId": "keyword_detail",
+    "summary": "关键词详情",
+    "tags": [
+     "数据服务"
+    ],
+    "parameters": [
+     {
+      "name": "slug",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 300,
+       "description": "关键词标识，取搜索结果的 slug。"
+      }
+     }
+    ]
+   }
+  },
+  "/api/v1/launches": {
+   "get": {
+    "operationId": "launch_search",
+    "summary": "新站搜索",
+    "tags": [
+     "数据服务"
+    ],
+    "parameters": [
+     {
+      "name": "q",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "string",
+       "maxLength": 60,
+       "description": "搜索标题、域名、用途或目标关键词，最多 60 字符；留空不筛选。"
+      }
+     },
+     {
+      "name": "type",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "string",
+       "enum": [
+        "site",
+        "repo",
+        "all"
+       ],
+       "default": "site",
+       "description": "类型，默认 site。site：网站和应用；repo：开源仓库；all：全部。"
+      }
+     },
+     {
+      "name": "motive",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "string",
+       "enum": [
+        "keyword",
+        "own_need",
+        "others_need",
+        "hobby",
+        "business",
+        "unknown"
+       ],
+       "description": "开发动机，默认不筛选。keyword：关键词需求；own_need：自身需求；others_need：他人需求；hobby：兴趣；business：商业机会；unknown：未说明。"
+      }
+     },
+     {
+      "name": "page",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "integer",
+       "minimum": 1,
+       "maximum": 180143985094819,
+       "default": 1,
+       "description": "页码，默认 1；超出末页返回空列表。"
+      }
+     }
+    ]
+   }
+  },
+  "/api/v1/hosted/sites": {
+   "get": {
+    "operationId": "hosted_site_search",
+    "summary": "网站搜索",
+    "tags": [
+     "数据服务"
+    ],
+    "parameters": [
+     {
+      "name": "q",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "string",
+       "maxLength": 60,
+       "description": "搜索网站地址或主要关键词，最多 60 字符；留空不筛选。"
+      }
+     },
+     {
+      "name": "generic",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "integer",
+       "enum": [
+        0,
+        1
+       ],
+       "default": 0,
+       "description": "默认 0。0：全部；1：仅通用词，排除品牌词和导航词。"
+      }
+     },
+     {
+      "name": "page",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "integer",
+       "minimum": 1,
+       "maximum": 180143985094819,
+       "default": 1,
+       "description": "页码，默认 1；超出末页返回空列表。"
+      }
+     }
+    ]
+   }
+  },
+  "/api/v1/hosted/site": {
+   "get": {
+    "operationId": "hosted_site_detail",
+    "summary": "网站详情",
+    "tags": [
+     "数据服务"
+    ],
+    "parameters": [
+     {
+      "name": "site",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 500,
+       "description": "网站标识，取搜索结果的 site。"
+      }
+     }
+    ]
+   }
+  },
+  "/api/v1/hosted/keyword": {
+   "get": {
+    "operationId": "hosted_keyword_detail",
+    "summary": "网站发现关键词详情",
+    "tags": [
+     "数据服务"
+    ],
+    "parameters": [
+     {
+      "name": "keyword",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 300,
+       "description": "关键词，取网站主要关键词或批次关键词列表。"
+      }
+     }
+    ]
+   }
+  },
+  "/api/v2/checkouts/sites": {
+   "get": {
+    "operationId": "income_site_search_v2",
+    "summary": "收入网站搜索",
+    "tags": [
+     "数据服务"
+    ],
+    "parameters": [
+     {
+      "name": "q",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "string",
+       "maxLength": 60,
+       "description": "域名或域名片段，最多 60 字符；留空不筛选。"
+      }
+     },
+     {
+      "name": "page",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "integer",
+       "minimum": 1,
+       "maximum": 180143985094819,
+       "default": 1,
+       "description": "页码，默认 1；超出末页返回空列表。"
+      }
+     }
+    ]
+   }
+  },
+  "/api/v2/checkouts/site": {
+   "get": {
+    "operationId": "income_site_detail_v2",
+    "summary": "收入网站详情",
+    "tags": [
+     "数据服务"
+    ],
+    "parameters": [
+     {
+      "name": "domain",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 253,
+       "description": "网站域名，取搜索结果的 domain。"
+      }
+     }
+    ]
+   }
+  },
+  "/api/v1/checkouts/months": {
+   "get": {
+    "summary": "收入 V1 已停用",
+    "tags": [
+     "数据服务"
+    ]
+   }
+  },
+  "/api/v1/checkouts/months/{month}": {
+   "get": {
+    "summary": "收入 V1 已停用",
+    "tags": [
+     "数据服务"
+    ],
+    "parameters": [
+     {
+      "name": "month",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string"
+      }
+     }
+    ]
+   }
+  },
+  "/api/v1/me": {
+   "get": {
+    "operationId": "me",
+    "summary": "我的积分余额（API 只扣余额）"
+   }
+  },
+  "/api/v1/usage": {
+   "get": {
+    "operationId": "usage",
+    "summary": "积分扣费明细（网站 + API 同一本账）",
+    "parameters": [
+     {
+      "name": "limit",
+      "in": "query",
+      "schema": {
+       "type": "integer",
+       "default": 50,
+       "maximum": 200
+      }
+     },
+     {
+      "name": "scope",
+      "in": "query",
+      "schema": {
+       "type": "string",
+       "enum": [
+        "all",
+        "api"
+       ],
+       "default": "all"
+      }
+     }
+    ]
+   }
+  }
+ }
+}
