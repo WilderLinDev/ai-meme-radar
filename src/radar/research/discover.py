@@ -113,33 +113,52 @@ def market_candidates(conn, m: Matcher, since: str) -> list[dict]:
     return out[:PER_CHANNEL]
 
 
+def _keys_of(c: dict) -> list[str]:
+    keys = []
+    if c.get("keyword") and keyword_key(c["keyword"]):
+        keys.append("kw|" + keyword_key(c["keyword"]))
+    if c.get("domain"):
+        keys.append("site|" + c["domain"])
+    return keys
+
+
 def group(cands: list[dict], m: Matcher) -> list[dict]:
-    """Merge candidates sharing a keyword key or a domain."""
-    groups: list[dict] = []
-    index: dict[str, int] = {}
-    for c in cands:
-        keys = []
-        if c.get("keyword"):
-            keys.append("kw|" + keyword_key(c["keyword"]))
-        if c.get("domain"):
-            keys.append("site|" + c["domain"])
-        gi = next((index[k] for k in keys if k in index), None)
-        if gi is None:
-            gi = len(groups)
-            label = c.get("keyword") or c.get("title") or c.get("domain") or "?"
-            groups.append({"label": label, "keys": [], "channels": [], "items": [], "matches": []})
-        g = groups[gi]
-        for k in keys:
-            index[k] = gi
-            if k not in g["keys"]:
-                g["keys"].append(k)
-        if c["channel"] not in g["channels"]:
-            g["channels"].append(c["channel"])
-        g["items"].append(c)
-    for g in groups:
-        texts = [i.get("keyword") or "" for i in g["items"]] + [i.get("title") or "" for i in g["items"]]
-        g["matches"] = sorted({r for t in texts if t for r in m.entities_for(t)})
-    groups.sort(key=lambda g: (-len(g["channels"]), not g["matches"], g["label"]))
+    """Connected components of candidates linked by a shared keyword key or domain (transitively)."""
+    parent = list(range(len(cands)))
+
+    def find(i: int) -> int:
+        while parent[i] != i:
+            parent[i] = parent[parent[i]]
+            i = parent[i]
+        return i
+
+    owner: dict[str, int] = {}
+    for i, c in enumerate(cands):
+        for k in _keys_of(c):
+            if k in owner:
+                a, b = find(owner[k]), find(i)
+                if a != b:
+                    parent[max(a, b)] = min(a, b)  # smallest index stays root: deterministic
+            else:
+                owner[k] = i
+    members: dict[int, list[int]] = {}
+    for i in range(len(cands)):
+        members.setdefault(find(i), []).append(i)
+    groups = []
+    for root in sorted(members):
+        items = [cands[i] for i in members[root]]
+        first = items[0]
+        keys: list[str] = []
+        channels: list[str] = []
+        for c in items:
+            keys += [k for k in _keys_of(c) if k not in keys]
+            if c["channel"] not in channels:
+                channels.append(c["channel"])
+        texts = [t for c in items for t in (c.get("keyword"), c.get("title")) if t]
+        groups.append({"label": first.get("keyword") or first.get("title") or first.get("domain") or "?",
+                       "keys": keys, "channels": channels, "items": items,
+                       "matches": sorted({r for t in texts for r in m.entities_for(t)})})
+    groups.sort(key=lambda g: (-len(g["channels"]), not g["matches"], g["label"], g["keys"]))
     return groups
 
 

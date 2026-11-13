@@ -111,10 +111,10 @@ def test_feedback_overrides_without_rewriting_history(conn, paths):
     assert db.one(conn, "SELECT COUNT(*) n FROM link_events")["n"] == 4  # 3 adds + 1 remove
 
 
-def _evidence(day: date, value: float, ref: str, entity="trend:ai-baby-dance", metric="posts_24h"):
-    return {"ref": ref, "entity": entity, "channel": "social", "source": "TikTok", "metric": metric,
-            "value": value, "unit": "posts", "region": "US", "metric_definition": "new posts in 24h",
-            "collected_at": f"{day.isoformat()}T09:00:00+08:00", "confidence": "medium", "tag": "已核实"}
+def _evidence(day: date, value: float, ref: str, entity="trend:ai-baby-dance", metric="posts_24h", **over):
+    """An observation measured exactly like the matching research_doc() evidence row."""
+    base = next(e for e in research_doc()["evidence"] if e["entity"] == entity and e["metric"] == metric)
+    return dict(base, ref=ref, value=value, collected_at=f"{day.isoformat()}T09:00:00+08:00", **over)
 
 
 def test_backtests_use_frozen_baselines(conn, paths):

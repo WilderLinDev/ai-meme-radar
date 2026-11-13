@@ -19,6 +19,12 @@ RISE = 0.15  # +15% = rising, -15% = falling, between = holding
 class Point:
     at: str
     value: float
+    ident: dict | None = None  # what was measured: source, metric, unit, definition, region
+
+
+def identity_key(ident: dict | None) -> str:
+    """Two observations are comparable only when these keys are equal (and not empty)."""
+    return db.dumps(ident) if ident else ""
 
 
 @dataclass
@@ -69,9 +75,14 @@ def stats(label: str, points: list[Point]) -> SeriesStats | None:
 
 
 def evidence_series(conn: sqlite3.Connection, entity: str, metric: str, region: str = "", source: str = "",
-                    until: str | None = None) -> list[Point]:
-    """One value per collection day (the last one that day), ordered by time."""
-    sql = ("SELECT collected_at, value FROM evidence WHERE entity=? AND metric=? AND region=? AND value IS NOT NULL")
+                    until: str | None = None, ident: dict | None = None) -> list[Point]:
+    """One value per collection day (the last that day), ordered by time, from ONE measurement identity.
+
+    The identity is (source, metric, unit, metric_definition, region). Without `ident`, the identity
+    of the latest matching observation is used, so a series never mixes sources, units or definitions.
+    """
+    sql = ("SELECT collected_at, value, source, unit, metric_definition FROM evidence WHERE entity=? AND metric=?"
+           " AND region=? AND value IS NOT NULL")
     params: list = [entity, metric, region.upper()]
     if source:
         sql += " AND source=?"
@@ -79,10 +90,19 @@ def evidence_series(conn: sqlite3.Connection, entity: str, metric: str, region: 
     if until:
         sql += " AND collected_at <= ?"
         params.append(until)
-    sql += " ORDER BY collected_at"
+    found = db.rows(conn, sql + " ORDER BY collected_at", params)
+
+    def ident_of(r: dict) -> dict:
+        return {"kind": "evidence", "entity": entity, "source": r["source"], "metric": metric,
+                "unit": r["unit"], "definition": r["metric_definition"], "region": region.upper()}
+    if not found:
+        return []
+    want = identity_key(ident or ident_of(found[-1]))
     by_day: dict[str, Point] = {}
-    for r in db.rows(conn, sql, params):
-        by_day[r["collected_at"][:10]] = Point(r["collected_at"], float(r["value"]))
+    for r in found:
+        i = ident_of(r)
+        if identity_key(i) == want:
+            by_day[r["collected_at"][:10]] = Point(r["collected_at"], float(r["value"]), i)
     return list(by_day.values())
 
 
@@ -92,38 +112,48 @@ def keyword_heat_series(conn: sqlite3.Connection, keyword: str, until: str | Non
     if until:
         sql += " AND captured_at <= ?"
         params.append(until)
+    ident = {"kind": "keyword_heat", "source": "Ge Fei", "metric": "heat_ratio", "keyword": keyword,
+             "unit": "x GPTs baseline", "definition": "7-day heat relative to the GPTs benchmark keyword",
+             "region": ""}
     by_day: dict[str, Point] = {}
     for r in db.rows(conn, sql + " ORDER BY captured_at", params):
-        by_day[r["captured_at"][:10]] = Point(r["captured_at"], float(r["heat_ratio"]))
+        by_day[r["captured_at"][:10]] = Point(r["captured_at"], float(r["heat_ratio"]), ident)
     return list(by_day.values())
 
 
-def tracked_points(conn: sqlite3.Connection, tracked: dict, entity: str, until: str | None = None) -> list[Point]:
+def tracked_points(conn: sqlite3.Connection, tracked: dict, entity: str, until: str | None = None,
+                   ident: dict | None = None) -> list[Point]:
+    """The tracked series; pass the frozen `ident` to keep later observations comparable to the baseline."""
     if tracked["kind"] == "keyword_heat":
         from ..text import keyword_key
-        return keyword_heat_series(conn, keyword_key(tracked["keyword"]), until)
+        pts = keyword_heat_series(conn, keyword_key(tracked["keyword"]), until)
+        return [p for p in pts if not ident or identity_key(p.ident) == identity_key(ident)]
     return evidence_series(conn, tracked.get("entity") or entity, tracked["metric"], tracked.get("region", ""),
-                           tracked.get("source", ""), until)
+                           tracked.get("source", ""), until, ident)
 
 
 def entity_facts(conn: sqlite3.Connection, entity: str, links: dict) -> dict:
     """Everything code knows about an entity, for the scaffold and the frozen snapshot."""
     kind, ident = parse_ref(entity)
-    ev = db.rows(conn, "SELECT channel, source, metric, region, value, collected_at, tag, confidence, day, ref"
+    ev = db.rows(conn, "SELECT channel, source, metric, region, value, unit, metric_definition, collected_at, tag,"
+                       " confidence, day, ref"
                        " FROM evidence WHERE entity=? ORDER BY collected_at", (entity,))
     series = []
     seen = set()
     for e in ev:
         if e["value"] is None or not e["metric"]:
             continue
-        key = (e["metric"], e["region"], e["source"])
+        key = (e["metric"], e["region"], e["source"], e["unit"], e["metric_definition"])
         if key in seen:
             continue
         seen.add(key)
+        measured = {"kind": "evidence", "entity": entity, "source": e["source"], "metric": e["metric"],
+                    "unit": e["unit"], "definition": e["metric_definition"], "region": e["region"]}
         s = stats(f"{e['source']} {e['metric']} {e['region'] or '-'}",
-                  evidence_series(conn, entity, e["metric"], e["region"], e["source"]))
+                  evidence_series(conn, entity, e["metric"], e["region"], e["source"], ident=measured))
         if s:
-            series.append({"metric": e["metric"], "region": e["region"], "source": e["source"], **s.to_dict()})
+            series.append({"metric": e["metric"], "region": e["region"], "source": e["source"], "unit": e["unit"],
+                           "definition": e["metric_definition"], **s.to_dict()})
     channels: dict[str, int] = {}
     for e in ev:
         channels[e["channel"]] = channels.get(e["channel"], 0) + 1

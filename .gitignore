@@ -6,6 +6,12 @@ __pycache__/
 
 # local settings and research data never live in the repo
 config/settings.toml
+settings.toml
+!config/settings.example.toml
+.env
+.env.*
+*.token
+run.lock
 *.db
 *.db-wal
 *.db-shm

@@ -75,7 +75,9 @@ Every conclusion keeps its source, collection time, region, sample size, metric 
 
 ## Backtests
 
-Both use the tracked series and the baseline frozen at assessment time. A value observed later, even one back-dated, never replaces the baseline. The final revision of each assessment day is judged.
+Both use the tracked series and the baseline frozen at assessment time. A value observed later, even one back-dated, never replaces the baseline. Only the final revision of each entity on each assessment day counts in official results. Results of superseded revisions stay stored for audit but never enter hit rates.
+
+Observations are compared only when they measure the same thing: the same source, metric, unit, metric definition and region (for keyword heat, the same keyword). The baseline freezes this identity, and an outcome must match it. The daily report likewise compares a tracked value with the previous report only when the identity is unchanged; otherwise it says the definition changed and computes no growth.
 
 **Lifecycle (7 days)**: compare the first observation at or after day + 7 (within 7 more days) with the baseline. Expected direction: early_signal / emerging → rising (≥ +15%), proven → holding (> −15%), fading → falling (≤ −15%), unless the assessment set `expected_direction`.
 

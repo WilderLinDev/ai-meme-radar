@@ -64,7 +64,7 @@ def test_full_run_waits_then_delivers_and_resumes(paths, conn, settings, fake):
     assert "## 为什么是现在" in deep and "## 证据清单" in deep and "【第三方读数】" in deep
     assert "AI Baby Dance" in deep  # trend reached through the format link
 
-    docs = {d["doc_key"]: d for d in lark.links(conn)}
+    docs = {d["doc_key"]: d for d in lark.documents(conn)}
     assert set(docs) == {"daily/2026-11-13", "opportunity/baby-dance-template"}
     assert all(d["status"] == "synced" and d["url"] for d in docs.values())
     assert lk.calls[0][lk.calls[0].index("--parent-token") + 1] in ("wikiDaily", "wikiOpp")

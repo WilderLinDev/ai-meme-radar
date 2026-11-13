@@ -12,7 +12,8 @@ from datetime import date
 
 from .. import backtest, db
 from ..config import Paths
-from ..decisions import all_effective, is_key, tracked_latest
+from ..decisions import all_effective, is_key, tracked_point
+from ..research.metrics import identity_key
 from ..gefei.sync import credits_spent
 from ..research.ingest import current_links
 from ..research.metrics import pct as pct_change
@@ -25,8 +26,28 @@ DECISION_ORDER = {"build": 0, "validate": 1, "monitor": 2, "skip": 3}
 
 
 def _state_record(conn, st: dict, day: date) -> dict:
+    p = tracked_point(conn, st, day)
     return {k: st[k] for k in ("lifecycle", "decision", "priority", "confidence", "assessed_day", "revision")} | {
-        "tracked_value": tracked_latest(conn, st, day), "overrides": len(st["overrides"])}
+        "tracked": {"value": p.value, "at": p.at, "ident": p.ident} if p else None,
+        "overrides": len(st["overrides"])}
+
+
+def tracked_move(prev: dict | None, cur: dict | None) -> tuple[float | None, str]:
+    """Change between two report states' tracked observations, only when they measure the same thing.
+
+    Returns (change, note). change is None when either side is missing, the identity is missing or
+    differs (source, metric, unit, definition, region), or the old value is 0; the note says why.
+    """
+    if not prev or not cur:
+        return None, ""
+    a, b = identity_key(prev.get("ident")), identity_key(cur.get("ident"))
+    if not a or not b:
+        return None, "跟踪指标缺少口径信息，不计算变化"
+    if a != b:
+        return None, "跟踪指标口径与上次不同，不计算变化"
+    if prev["at"] == cur["at"]:
+        return None, ""
+    return pct_change(cur["value"], prev["value"]), ""
 
 
 def previous_states(conn: sqlite3.Connection, day: date) -> tuple[str | None, dict[str, dict]]:
@@ -147,11 +168,14 @@ def render(conn: sqlite3.Connection, day: date, paths: Paths) -> tuple[str, list
         notes = []
         if p["lifecycle"] != st["lifecycle"]:
             notes.append(f"生命周期 {LIFECYCLE_ZH[p['lifecycle']]} → {LIFECYCLE_ZH[st['lifecycle']]}")
-        now_v, old_v = tracked_latest(conn, st, day), p.get("tracked_value")
-        if now_v is not None and old_v:
-            ch = pct_change(now_v, old_v)
-            if ch is not None and abs(ch) >= BIG_MOVE:
-                notes.append(f"跟踪指标 {num(old_v)} → {num(now_v)}（{pct(ch)}）【已核实·本地快照】")
+        cur = _state_record(conn, st, day)["tracked"]
+        ch, why = tracked_move(p.get("tracked"), cur)
+        if ch is not None and abs(ch) >= BIG_MOVE:
+            i = cur["ident"]
+            notes.append(f"跟踪指标（{i['source']} {i['metric']} {i['region'] or '—'}）{num(p['tracked']['value'])} → "
+                         f"{num(cur['value'])}（{pct(ch)}）【已核实·本地快照】")
+        elif why and p.get("tracked"):
+            notes.append(why)
         if notes:
             moves.append((st, "；".join(notes)))
     out += ["## 3. 重要趋势变化", ""]

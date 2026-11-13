@@ -43,16 +43,41 @@ def doc_key(report: dict) -> str:
     return report["key"]
 
 
-def pending(conn: sqlite3.Connection) -> list[tuple[str, dict]]:
-    """(doc_key, latest report) pairs whose content differs from what Lark has."""
+def _latest_reports(conn: sqlite3.Connection) -> dict[str, dict]:
     latest: dict[str, dict] = {}
     for r in db.rows(conn, "SELECT * FROM reports ORDER BY day, key"):
         latest[doc_key(r)] = r
+    return latest
+
+
+def pending(conn: sqlite3.Connection) -> list[tuple[str, dict]]:
+    """(doc_key, latest report) pairs whose content differs from what Lark has."""
     out = []
-    for k, r in latest.items():
+    for k, r in _latest_reports(conn).items():
         d = db.one(conn, "SELECT synced_hash, status FROM lark_docs WHERE doc_key=?", (k,))
         if not d or d["synced_hash"] != r["content_hash"] or d["status"] != "synced":
             out.append((k, r))
+    return out
+
+
+def documents(conn: sqlite3.Connection) -> list[dict]:
+    """Every report's Lark document: name, type, status, URL, error, local path.
+
+    status: synced (Lark has the latest local content), stale (published, local report changed since),
+    failed (last publish failed; see error), unpublished (never published, e.g. Lark disabled).
+    """
+    out = []
+    for k, r in _latest_reports(conn).items():
+        d = db.one(conn, "SELECT * FROM lark_docs WHERE doc_key=?", (k,)) or {}
+        if d.get("status") == "failed":
+            status = "failed"
+        elif d.get("status") == "synced":
+            status = "synced" if d.get("synced_hash") == r["content_hash"] else "stale"
+        else:
+            status = "unpublished"
+        out.append({"doc_key": k, "name": r["title"], "type": r["kind"], "status": status,
+                    "url": d.get("url") or "", "error": d.get("last_error") or "", "local_path": r["path"],
+                    "synced_at": d.get("synced_at") or ""})
     return out
 
 
@@ -119,7 +144,3 @@ def publish(conn: sqlite3.Connection, settings: LarkSettings, runner: Runner = s
                     " last_error=excluded.last_error", (key, msg))
                 res.failed.append(f"{key}: {msg}")
     return res
-
-
-def links(conn: sqlite3.Connection) -> list[dict]:
-    return db.rows(conn, "SELECT doc_key, url, status, synced_at, last_error FROM lark_docs ORDER BY doc_key")

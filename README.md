@@ -16,7 +16,22 @@ cp config/settings.example.toml ~/.config/ai-meme-radar/settings.toml   # 填入
 uv run python scripts/run_day.py run
 ```
 
-`run` 会执行所有能执行的阶段；需要 Agent 写入研究文件时以退出码 2 停下并说明要写什么，写好后再次运行即可从断点继续。
+`run` 会执行所有能执行的阶段；需要 Agent 写入研究文件时以退出码 2 停下并说明要写什么，写好后再次运行即可从断点继续。已有运行在进行时以退出码 3 退出。`status` 查看各阶段进度、日报路径和所有飞书文档的状态与链接。
+
+## 配置
+
+优先级：环境变量 > `settings.toml` > 默认值。所有配置只在 `src/radar/config.py` 读取。
+
+| 环境变量 | 作用 | 对应 TOML |
+| --- | --- | --- |
+| `GEFEI_API_TOKEN` | 哥飞 API token（密钥，仅同步与 `call` 需要） | `[gefei] token` |
+| `AMR_CONFIG_DIR` | `settings.toml` 所在目录，默认 `~/.config/ai-meme-radar/` | — |
+| `AMR_DATA_DIR` | 数据目录，默认 `~/ai-meme-radar-data` | `[paths] data_dir` |
+| `AMR_REPORTS_DIR` | 报告目录，默认 `<数据目录>/reports` | `[paths] reports_dir` |
+
+飞书登录由 `lark-cli auth login` 管理，本项目不保存飞书凭据。仓库公开：不要提交 token 或真实的 `settings.toml`。
+
+数据库没有迁移：如果代码的 `SCHEMA_VERSION` 与现有 `radar.db` 不一致，程序会拒绝打开并提示；把旧文件移开后重新运行即可生成新库。
 
 ## 文档
 
@@ -25,4 +40,4 @@ uv run python scripts/run_day.py run
 - `docs/research-method.md`：研究与决策框架、回测
 - `docs/adr/`：架构决策
 
-数据默认在 `~/ai-meme-radar-data/`（仓库之外），设置在 `~/.config/ai-meme-radar/settings.toml`。仓库里没有任何密钥。
+数据默认在 `~/ai-meme-radar-data/`（仓库之外）。仓库里没有任何密钥。

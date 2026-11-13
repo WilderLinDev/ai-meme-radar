@@ -42,6 +42,31 @@ RELATIONS = {
 }
 
 
+def check_link(src: str, dst: str, relation: str) -> tuple[str, str]:
+    """The one rule for links, used by research files and human feedback alike.
+
+    Both refs must parse, and (src kind, dst kind, relation) must be in RELATIONS, in that direction.
+    Returns the normalized refs.
+    """
+    sk, si = parse_ref(src)
+    dk, di = parse_ref(dst)
+    allowed = RELATIONS.get((sk, dk))
+    if not allowed or relation not in allowed:
+        opts = sorted(f"{a}->{b}:{'|'.join(sorted(r))}" for (a, b), r in RELATIONS.items())
+        raise ValueError(f"link {src} -[{relation}]-> {dst} not allowed; allowed: {opts}")
+    if (sk, si) == (dk, di):
+        raise ValueError(f"link {src} -> {dst} points at itself")
+    return f"{sk}:{si}", f"{dk}:{di}"
+
+
+def split_link_value(value: str) -> tuple[str, str]:
+    """Feedback link value 'relation->kind:id' -> (relation, target ref)."""
+    relation, sep, target = value.partition("->")
+    if not sep or not relation.strip() or not target.strip():
+        raise ValueError("link feedback value must look like 'relation->kind:id'")
+    return relation.strip(), target.strip()
+
+
 class Strict(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -89,12 +114,7 @@ class LinkIn(Strict):
 
     @model_validator(mode="after")
     def _check(self):
-        sk, _ = parse_ref(self.src)
-        dk, _ = parse_ref(self.dst)
-        allowed = RELATIONS.get((sk, dk))
-        if not allowed or self.relation not in allowed:
-            opts = sorted(f"{a}->{b}:{'|'.join(sorted(r))}" for (a, b), r in RELATIONS.items())
-            raise ValueError(f"link {self.src} -[{self.relation}]-> {self.dst} not allowed; allowed: {opts}")
+        check_link(self.src, self.dst, self.relation)
         return self
 
 
@@ -254,8 +274,9 @@ class FeedbackIn(Strict):
         allowed = {"decision": Decision, "priority": Priority, "lifecycle": Lifecycle}.get(self.field)
         if allowed and self.value not in allowed.__args__:
             raise ValueError(f"feedback {self.field}={self.value!r} must be one of {allowed.__args__}")
-        if self.field in ("link_add", "link_remove") and "->" not in self.value:
-            raise ValueError("link feedback value must look like 'relation->kind:id'")
+        if self.field in ("link_add", "link_remove"):
+            relation, target = split_link_value(self.value)
+            check_link(self.entity, target, relation)
         if not self.reason.strip():
             raise ValueError("feedback needs a reason")
         if self.at.tzinfo is None:

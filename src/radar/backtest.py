@@ -28,17 +28,29 @@ SUPPORT_FLOOR = -0.10
 MISSED_RISE = 0.30
 
 
+# The official set: the final revision of each (day, entity). Results of superseded revisions stay
+# stored for audit but never count in summaries or resolutions.
+FINAL = ("SELECT a.* FROM assessments a JOIN (SELECT day, entity, MAX(revision) AS rev FROM assessments"
+         " GROUP BY day, entity) m ON a.day=m.day AND a.entity=m.entity AND a.revision=m.rev")
+
+
 def _judged(conn: sqlite3.Connection) -> list[dict]:
-    """Final revision per (day, entity)."""
-    return db.rows(conn, "SELECT a.* FROM assessments a JOIN (SELECT day, entity, MAX(revision) AS rev FROM assessments"
-                         " GROUP BY day, entity) m ON a.day=m.day AND a.entity=m.entity AND a.revision=m.rev"
-                         " ORDER BY a.day, a.entity")
+    return db.rows(conn, FINAL + " ORDER BY a.day, a.entity")
 
 
-def _outcome_point(conn, tracked: dict, entity: str, day: date, horizon: int) -> metrics.Point | None:
+def official(conn: sqlite3.Connection, where: str = "", params: tuple = ()) -> list[dict]:
+    """Backtest rows of final revisions only, joined with their assessment."""
+    sql = (f"SELECT b.*, f.entity, f.day AS assessed_day, f.revision, f.lifecycle, f.decision"
+           f" FROM backtest_results b JOIN ({FINAL}) f ON f.id = b.assessment_id")
+    return db.rows(conn, sql + (f" WHERE {where}" if where else "") + " ORDER BY f.day, b.system, f.entity", params)
+
+
+def _outcome_point(conn, tracked: dict, entity: str, day: date, horizon: int,
+                   ident: dict | None) -> metrics.Point | None:
+    """First observation in the outcome window measured exactly like the frozen baseline."""
     due = (day + timedelta(days=horizon)).isoformat()
     last = (day + timedelta(days=horizon + GRACE)).isoformat()
-    for p in metrics.tracked_points(conn, tracked, entity):
+    for p in metrics.tracked_points(conn, tracked, entity, ident=ident):
         if due <= p.at[:10] <= last:
             return p
     return None
@@ -78,10 +90,12 @@ def evaluate(conn: sqlite3.Connection, today: date) -> dict:
                        "change_pct": None, "evaluated_at": now_iso()}
                 if not tracked or not base:
                     row |= {"outcome": "unscorable", "detail": "no tracked series frozen at assessment time"}
+                elif not base.get("ident"):
+                    row |= {"outcome": "unscorable", "detail": "baseline has no measurement identity"}
                 elif base["value"] == 0:
                     row |= {"outcome": "unscorable", "detail": "baseline is 0; change is undefined"}
                 else:
-                    p = _outcome_point(conn, tracked, a["entity"], day, horizon)
+                    p = _outcome_point(conn, tracked, a["entity"], day, horizon, base.get("ident"))
                     if p is None:
                         expired = today > day + timedelta(days=horizon + GRACE)
                         row |= {"outcome": "no_data" if expired else "pending",
@@ -114,9 +128,9 @@ BAD = {"lifecycle": {"miss"}, "decision": {"not_supported", "missed_upside", "mi
 def summary(conn: sqlite3.Connection) -> dict:
     out = {}
     for system in ("lifecycle", "decision"):
-        rows = db.rows(conn, "SELECT outcome, COUNT(*) AS n FROM backtest_results WHERE system=? GROUP BY outcome",
-                       (system,))
-        c = {r["outcome"]: r["n"] for r in rows}
+        c: dict[str, int] = {}
+        for r in official(conn, "b.system=?", (system,)):
+            c[r["outcome"]] = c.get(r["outcome"], 0) + 1
         good = sum(v for k, v in c.items() if k in GOOD[system])
         bad = sum(v for k, v in c.items() if k in BAD[system])
         out[system] = {"counts": c, "scored": good + bad, "good": good,
@@ -125,7 +139,5 @@ def summary(conn: sqlite3.Connection) -> dict:
 
 
 def resolved_on(conn: sqlite3.Connection, day: date) -> list[dict]:
-    """Results whose outcome observation fell on `day` (newly scored)."""
-    return db.rows(conn, "SELECT b.*, a.entity, a.day AS assessed_day, a.lifecycle, a.decision FROM backtest_results b"
-                         " JOIN assessments a ON a.id=b.assessment_id WHERE substr(b.outcome_at,1,10)=?"
-                         " ORDER BY b.system, a.entity", (day.isoformat(),))
+    """Official results whose outcome observation fell on `day` (newly scored)."""
+    return official(conn, "substr(b.outcome_at,1,10)=?", (day.isoformat(),))

@@ -8,14 +8,18 @@
 
 run     Runs every stage that can run (preflight, sync, discover, research, scaffold, decide,
         backtest, report, publish) and resumes from what is already done. Exit 0 = delivered,
-        2 = waiting for an agent file in <data>/work/DAY/, 1 = failed (see the message).
+        2 = waiting for an agent file in <data>/work/DAY/, 1 = failed (see the message),
+        3 = another run is in progress (single-instance lock on <data>/run.lock).
 call    Calls one Ge Fei tool through the recorded client: request, response, requestId and credits
         are stored in SQLite; an identical successful call inside the reuse window is served from
         SQLite instead. Prints {"call_id", "cached", "credits", "data"} as JSON.
 tools   Lists the live Ge Fei catalog (refreshed from /api/v1/tools and /api/openapi.json).
-status  Last event of every stage for DAY, sync units waiting for retry, Lark documents not synced.
+status  Last event of every stage for DAY, sync units waiting for retry, the daily report path, and every
+        Lark document: name, type, status (synced/stale/failed/unpublished), URL, local path, error.
 
-DAY defaults to today in Asia/Shanghai. Data lives outside the repo (see `src/radar/config.py`).
+DAY defaults to today in Asia/Shanghai. Settings: environment variables (GEFEI_API_TOKEN, AMR_CONFIG_DIR,
+AMR_DATA_DIR, AMR_REPORTS_DIR) override $AMR_CONFIG_DIR/settings.toml (default
+~/.config/ai-meme-radar/settings.toml), which overrides defaults. Data lives outside the repo.
 """
 from __future__ import annotations
 
@@ -28,7 +32,8 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from radar import pipeline  # noqa: E402
-from radar.config import Paths, load_settings, today  # noqa: E402
+from radar.config import ConfigError, Paths, load_settings, today  # noqa: E402
+from radar.db import SchemaError  # noqa: E402
 from radar.gefei.client import Client, GefeiError  # noqa: E402
 from radar.gefei.sync import SERVICES  # noqa: E402
 
@@ -52,9 +57,13 @@ def main(argv: list[str] | None = None) -> int:
     s.add_argument("day", nargs="?")
     a = ap.parse_args(argv)
 
-    settings = load_settings()
-    paths = Paths.resolve(settings)
-    conn = pipeline.open_db(paths)
+    try:
+        settings = load_settings()
+        paths = Paths.resolve(settings)
+        conn = pipeline.open_db(paths)
+    except (ConfigError, SchemaError) as e:
+        print(f"error: {e}", file=sys.stderr)
+        return 1
     day = date.fromisoformat(a.day) if getattr(a, "day", None) else today()
 
     if a.cmd == "run":
@@ -74,7 +83,7 @@ def main(argv: list[str] | None = None) -> int:
         try:
             tools = client.refresh_catalog(force=True)
         except GefeiError as e:
-            print(str(e), file=sys.stderr)
+            print(settings.redact(str(e)), file=sys.stderr)
             return 1
         for tool in sorted(tools.values(), key=lambda x: (x.group, x.id)):
             if a.group and tool.group != a.group:
@@ -85,8 +94,10 @@ def main(argv: list[str] | None = None) -> int:
         print(f"{len(tools)} tools")
         return 0
 
-    if not settings.token:
-        print("No Ge Fei token: set [gefei] token in settings.toml or $GEFEI_API_TOKEN.", file=sys.stderr)
+    try:
+        settings.require_token()
+    except ConfigError as e:
+        print(f"error: {e}", file=sys.stderr)
         return 1
     try:
         params = json.loads(a.params)
@@ -98,7 +109,7 @@ def main(argv: list[str] | None = None) -> int:
         client.refresh_catalog()
         res = client.call(a.tool, params, purpose=a.purpose, max_age=max_age)
     except (GefeiError, KeyError, ValueError) as e:
-        print(str(e), file=sys.stderr)
+        print(settings.redact(str(e)), file=sys.stderr)
         return 1
     print(json.dumps({"call_id": res.call_id, "cached": res.cached, "request_id": res.request_id,
                       "credits": res.credits, "data": res.data, "markdown": res.body.get("markdown")},

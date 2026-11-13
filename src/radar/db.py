@@ -333,14 +333,36 @@ CREATE TABLE IF NOT EXISTS lark_docs (
 """
 
 
+class SchemaError(RuntimeError):
+    pass
+
+
 def connect(path: Path) -> sqlite3.Connection:
+    """Open the store. An empty file is initialized; a different schema version is refused.
+
+    There are no migrations: when SCHEMA_VERSION changes, move the old radar.db aside and start a
+    fresh one (research data is rebuilt from Ge Fei sync and new research, never migrated).
+    """
     path.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(path, isolation_level=None)  # autocommit; use tx() for atomic blocks
     conn.row_factory = sqlite3.Row
-    conn.execute("PRAGMA journal_mode=WAL")
-    conn.execute("PRAGMA foreign_keys=ON")
-    conn.executescript(SCHEMA)
-    conn.execute(f"PRAGMA user_version={SCHEMA_VERSION}")
+    try:
+        version = conn.execute("PRAGMA user_version").fetchone()[0]
+        has_tables = conn.execute("SELECT COUNT(*) FROM sqlite_master WHERE type='table'").fetchone()[0] > 0
+        if version == 0 and has_tables:
+            raise SchemaError(f"{path} has tables but no AI Meme Radar schema version; it is not a radar database. "
+                              f"Point AMR_DATA_DIR elsewhere or move the file aside.")
+        if version not in (0, SCHEMA_VERSION):
+            raise SchemaError(f"{path} has schema version {version}; this code needs {SCHEMA_VERSION}. "
+                              f"There are no migrations: move the file aside and run again to start a fresh store.")
+        conn.execute("PRAGMA journal_mode=WAL")
+        conn.execute("PRAGMA foreign_keys=ON")
+        if version == 0:
+            conn.executescript(SCHEMA)
+            conn.execute(f"PRAGMA user_version={SCHEMA_VERSION}")
+    except BaseException:
+        conn.close()
+        raise
     return conn
 
 

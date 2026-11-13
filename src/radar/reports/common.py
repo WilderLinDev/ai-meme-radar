@@ -85,22 +85,26 @@ def write_report(conn: sqlite3.Connection, key: str, kind: str, day: str, entity
     return True
 
 
-def evidence_rows(conn: sqlite3.Connection, entities: list[str], limit: int = 40) -> list[str]:
-    if not entities:
-        return []
-    marks = ",".join("?" for _ in entities)
-    rows = db.rows(conn, f"SELECT * FROM evidence WHERE entity IN ({marks}) ORDER BY collected_at DESC LIMIT ?",
-                   (*entities, limit))
+def evidence_rows(conn: sqlite3.Connection, entities: list[str], per_entity: int = 12) -> list[str]:
+    """Evidence ledger for exactly these entities (latest `per_entity` each), in the given entity order."""
+    rows = []
+    for ent in entities:
+        rows += db.rows(conn, "SELECT * FROM evidence WHERE entity=? ORDER BY collected_at DESC, id DESC LIMIT ?",
+                        (ent, per_entity))
     if not rows:
         return ["暂无已入库的证据。"]
-    out = ["| 对象 | 渠道 | 来源 | 指标 | 数值 | 地区 | 样本 | 采集时间 | 标注 | 可信度 | 口径 |",
-           "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |"]
+    out = ["| 引用 | 对象 | 渠道 | 来源 | 指标 | 数值 | 地区 | 样本 | 采集时间 | 标注 | 可信度 | 口径 |",
+           "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |"]
     for e in rows:
         src = f"[{cell(e['source'])}]({e['url']})" if e["url"] else cell(e["source"])
+        if e["api_call_id"]:
+            src += f"（call:{e['api_call_id']}）"
         value = (num(e["value"]) + (f" {e['unit']}" if e["unit"] else "")) if e["value"] is not None else cell(e["note"])
-        out.append(f"| {cell(name_of(conn, e['entity']))} | {CHANNEL_ZH[e['channel']]} | {src} | {cell(e['metric'])} |"
-                   f" {value} | {e['region'] or '—'} | {e['sample_size'] or '—'} | {e['collected_at'][:16]} |"
-                   f" 【{e['tag']}】 | {CONFIDENCE_ZH[e['confidence']]} | {cell(e['metric_definition'])} |")
+        kind = e["entity"].split(":", 1)[0]
+        out.append(f"| {cell(e['ref'] or '—')} | {KIND_ZH[kind]}·{cell(name_of(conn, e['entity']))} |"
+                   f" {CHANNEL_ZH[e['channel']]} | {src} | {cell(e['metric'])} | {value} | {e['region'] or '—'} |"
+                   f" {e['sample_size'] or '—'} | {e['collected_at'][:16]} | 【{e['tag']}】 |"
+                   f" {CONFIDENCE_ZH[e['confidence']]} | {cell(e['metric_definition'])} |")
     return out
 
 

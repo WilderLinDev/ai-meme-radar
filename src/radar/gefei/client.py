@@ -19,7 +19,7 @@ from datetime import date, datetime, timedelta
 from typing import Callable
 
 from .. import db
-from ..config import now_iso, today
+from ..config import now_iso, redact, today
 from . import catalog
 
 Transport = Callable[[str, str, dict, bytes | None], tuple[int, dict, bytes]]
@@ -87,7 +87,7 @@ class Client:
     def _get_json(self, path: str) -> dict:
         status, _, raw = self.transport("GET", self.base + path, {"Accept": "application/json"}, None)
         if status != 200:
-            raise GefeiError(path, status, "catalog", raw[:200].decode("utf-8", "replace"), 0)
+            raise GefeiError(path, status, "catalog", redact(raw[:200].decode("utf-8", "replace"), self.token), 0)
         return json.loads(raw)
 
     # ---- calls ----
@@ -125,8 +125,9 @@ class Client:
             try:
                 status, rh, raw = self.transport(method, url, headers, payload)
             except OSError as e:  # network failure: record and stop
-                self._finish(call_id, None, {}, None, "network", str(e))
-                raise GefeiError(tool_id, None, "network", str(e), call_id) from e
+                msg = redact(str(e), self.token)
+                self._finish(call_id, None, {}, None, "network", msg)
+                raise GefeiError(tool_id, None, "network", msg, call_id) from None
             parsed = _parse(raw)
             if status in RETRY_STATUS and attempt < self.max_retries:
                 attempt += 1
@@ -137,6 +138,7 @@ class Client:
         ok = status == 200 and bool(parsed.get("ok", True)) if isinstance(parsed, dict) else False
         code = "" if ok else str((parsed or {}).get("code", "") if isinstance(parsed, dict) else "")
         err = "" if ok else str((parsed or {}).get("error", "") if isinstance(parsed, dict) else raw[:300])
+        err = redact(err, self.token)
         self._finish(call_id, status, rh, parsed, code, err, ok=ok)
         rid = _request_id(parsed, rh)
         if not ok:

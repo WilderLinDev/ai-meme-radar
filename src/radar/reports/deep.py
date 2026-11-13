@@ -10,7 +10,7 @@ from __future__ import annotations
 import sqlite3
 from datetime import date
 
-from .. import db
+from .. import backtest, db
 from ..config import Paths
 from ..decisions import all_effective, is_key
 from ..research import metrics
@@ -33,17 +33,30 @@ def _neighbours(entity: str, links) -> list[tuple[str, str]]:
     return sorted({(d if s == entity else s, rel) for (s, d, rel) in links if entity in (s, d)})
 
 
+KIND_ORDER = {"opportunity": 0, "trend": 1, "format": 2, "keyword": 3, "site": 4}
+
+
+def evidence_scope(ent: str, links) -> tuple[list[str], list[str]]:
+    """Entities whose evidence belongs in this opportunity's report, and the trends reached via formats.
+
+    In scope: the opportunity; everything linked to it directly (trends, formats, keywords, sites);
+    trends behind its formats; keywords and sites of those trends and formats. Nothing further out.
+    """
+    direct = [o for o, _ in _neighbours(ent, links)]
+    via_format = sorted({o for f in direct if f.startswith("format:") for o, _ in _neighbours(f, links)
+                         if o.startswith("trend:") and o not in direct})
+    hubs = [o for o in direct + via_format if o.split(":", 1)[0] in ("trend", "format")]
+    leaves = {o for h in hubs for o, _ in _neighbours(h, links) if o.split(":", 1)[0] in ("keyword", "site")}
+    scope = {ent, *direct, *via_format, *leaves}
+    return sorted(scope, key=lambda r: (KIND_ORDER[r.split(":", 1)[0]], r)), via_format
+
+
 def render(conn: sqlite3.Connection, st: dict, day: date) -> str:
     links = current_links(conn)
     ent = st["entity"]
     b = st["body"]
     nb = _neighbours(ent, links)
-    # one hop further: trends behind this opportunity's formats
-    second = []
-    for other, _ in nb:
-        if other.startswith("format:"):
-            second += [o for o, _ in _neighbours(other, links) if o.startswith("trend:")]
-    related = sorted({o for o, _ in nb} | set(second))
+    scope, second = evidence_scope(ent, links)
     out = [f"# 深度研究：{name_of(conn, ent)}", "",
            f"**{attrs(st)}** · 评估日 {st['assessed_day']}（第 {st['revision']} 版）", "",
            f"> 研究重点（{FOCUS_ZH[st['lifecycle']]}）", "", b["summary"], ""]
@@ -60,9 +73,9 @@ def render(conn: sqlite3.Connection, st: dict, day: date) -> str:
         out.append(f"- {KIND_ZH[kind]}：{name_of(conn, other)}（{rel}）")
     for t in sorted(set(second)):
         out.append(f"- 经由格式关联的趋势：{name_of(conn, t)}")
-    out += ["", "## 证据清单", ""] + evidence_rows(conn, [ent, *[r for r in related if r.split(':')[0] in
-                                                                ('trend', 'format', 'opportunity')]]) + [""]
-    kws = [o.split(":", 1)[1] for o, _ in nb if o.startswith("keyword:")]
+    out += ["", "## 证据清单", "", "范围：本机会、直接关联对象、经由格式关联的趋势，以及这些趋势/格式的关键词与网站。", ""]
+    out += evidence_rows(conn, scope) + [""]
+    kws = [o.split(":", 1)[1] for o in scope if o.startswith("keyword:")]
     if kws:
         out += ["## 哥飞关键词序列", "", "| 关键词 | 点数 | 最新 heat_ratio | 前值 | 变化 | 峰值 | 距峰值 |",
                 "| --- | --- | --- | --- | --- | --- | --- |"]
@@ -81,8 +94,7 @@ def render(conn: sqlite3.Connection, st: dict, day: date) -> str:
             label = FIELD_ZH.get(f["field"], f["field"])
             out.append(f"- {f['at'][:16]} {f['author']}：{label} {f['old_value'] or ''} → {f['new_value']}（{f['reason']}）")
         out.append("")
-    bt = db.rows(conn, "SELECT b.*, a.day FROM backtest_results b JOIN assessments a ON a.id=b.assessment_id"
-                       " WHERE a.entity=? ORDER BY a.day, b.system", (ent,))
+    bt = [dict(r, day=r["assessed_day"]) for r in backtest.official(conn, "f.entity=?", (ent,))]
     if bt:
         out += ["## 回测记录", "", "| 评估日 | 体系 | 基线 | 结果值 | 变化 | 结论 |", "| --- | --- | --- | --- | --- | --- |"]
         for r in bt:

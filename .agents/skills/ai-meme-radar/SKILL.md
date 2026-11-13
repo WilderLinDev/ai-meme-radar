@@ -36,10 +36,15 @@ Ask the user only for what preflight prints under `Ask:`, or for a login a live 
 
 - Code: this repo. Data: `~/ai-meme-radar-data/` (`$AMR_DATA_DIR` or `[paths] data_dir` override), outside Git:
   - `radar.db` - the only research store
-  - `reports/daily/DAY.md`, `reports/opportunities/<id>/DAY.md`
+  - `reports/daily/DAY.md`, `reports/opportunities/<id>/DAY.md` (under `$AMR_REPORTS_DIR` / `[paths] reports_dir` if set)
   - `work/DAY/` - `candidates.json`, `assessments.draft.json` (Python) and `research.json`, `assessments.json` (you)
   - `feedback/*.json` - human feedback
-- Settings: `~/.config/ai-meme-radar/settings.toml` (`$AMR_CONFIG_DIR`), template `config/settings.example.toml`. The Ge Fei token goes there or in `$GEFEI_API_TOKEN`, never in the repo.
+- Settings: one loader (`src/radar/config.py`). Precedence: environment variables > `settings.toml` > defaults.
+  - `settings.toml` is in `$AMR_CONFIG_DIR`, else `~/.config/ai-meme-radar/`. Template: `config/settings.example.toml`. Every key is optional.
+  - Env vars: `GEFEI_API_TOKEN` (secret), `AMR_CONFIG_DIR`, `AMR_DATA_DIR`, `AMR_REPORTS_DIR`.
+  - Required credential: only the Ge Fei token, and only for sync and `call`. Without it, preflight lists it under `Ask:` and the day still runs on browser research.
+  - Lark login is lark-cli's own (`lark-cli auth login`); the app stores no Lark credential.
+  - Never paste the token into chat, files in the repo, commit messages or reports. Output is redacted, but don't rely on that.
 
 ## The one entry point
 
@@ -47,10 +52,12 @@ Ask the user only for what preflight prints under `Ask:`, or for a login a live 
 uv run python scripts/run_day.py run [DAY]            # every stage that can run; resumes
 uv run python scripts/run_day.py call TOOL '{json}'   # one recorded Ge Fei call
 uv run python scripts/run_day.py tools [GROUP]        # the live Ge Fei catalog
-uv run python scripts/run_day.py status [DAY]         # stage log, sync retries, unsynced Lark docs
+uv run python scripts/run_day.py status [DAY]         # stage log, sync retries, report path, every Lark doc + URL
 ```
 
-`run` exits 0 when the day is delivered, 2 when it is waiting for one of your files (it prints which), 1 on failure. Stages: preflight → sync → discover → research → scaffold → decide → backtest → report → publish. Sync and publish failures are recorded as gaps and do not stop the day.
+`run` exits 0 when the day is delivered, 2 when it is waiting for one of your files (it prints which), 1 on failure (input problems are listed all at once), 3 when another run already holds `<data>/run.lock`. Stages: preflight → sync → discover → research → scaffold → decide → backtest → report → publish. Sync and publish failures are recorded as gaps and do not stop the day or touch local reports.
+
+`status DAY` prints the last event of every stage, sync units waiting for retry, the daily report path, and every Lark document as `[type] name | status | URL | local path | error`. Status is synced, stale (local report changed since publishing; the next `run` republishes), failed (with the reason) or unpublished (Lark off). `status`, `tools` and `call` don't take the lock.
 
 ## Daily procedure
 
@@ -118,7 +125,7 @@ Rerun until the day exits 0.
 
 ### 6. Deliver
 
-`run` writes `reports/daily/DAY.md` and the in-depth reports, then publishes them to Lark when enabled. Reply in chat with: the key opportunities (four attributes + one line each), new early signals, decision changes, the backtest line, gaps, credits spent today, local report paths and the Lark URLs (`status` lists any not synced). If nothing changed, say so in one line.
+`run` writes `reports/daily/DAY.md` and the in-depth reports, then publishes them to Lark when enabled. Reply in chat with: the key opportunities (four attributes + one line each), new early signals, decision changes, the backtest line, gaps, credits spent today, local report paths and the Lark URLs (copy them from `status DAY`; report any document that is not `synced`, with its error). If nothing changed, say so in one line.
 
 ## Human feedback
 
@@ -129,7 +136,7 @@ People change decisions, priorities, lifecycle, links or research direction by d
   "reason": "team capacity", "author": "name", "at": "2026-11-14T09:00:00+08:00"}]}
 ```
 
-`field` is decision / priority / lifecycle / link_add / link_remove (`value` = `relation->kind:id`) / direction (free text guiding your next research). Each item is applied once. The agent's original assessment is never changed; the effective state shows both. The draft shows them under `facts.human_feedback`; act on research directions in your next sweep.
+`field` is decision / priority / lifecycle / link_add / link_remove (`value` = `relation->kind:id`) / direction (free text guiding your next research). Links in feedback go through the same check as `research.json` links: allowed relation, correct direction, and both ends must exist. Each item is applied once. The agent's original assessment is never changed; the effective state shows both. The draft shows them under `facts.human_feedback`; act on research directions in your next sweep.
 
 ## Lark
 
@@ -137,7 +144,11 @@ Only finished reports go to Lark: one document per daily report, one document pe
 
 ## Recovery
 
-Rerun `run` with the same DAY. Finished sync units are skipped, failed ones retried; ingest is idempotent; unchanged reports are not rewritten or republished. `status DAY` shows the last event of every stage. If an input file is rejected, fix that file; never edit the database to get past a check.
+Rerun `run` with the same DAY. Finished sync units are skipped and failed ones retried. Ingest is idempotent, and unchanged reports are neither rewritten nor republished. Use `status DAY` to see where it stopped.
+- Exit 3: another run is in progress. Wait for it; never delete `run.lock`. A leftover file from a crashed run doesn't block anything, because the OS releases the lock when the process dies.
+- Rejected input file: fix that file. Never edit the database to get past a check.
+- `schema version N; this code needs M`: the database was made by an incompatible version. There are no migrations. Ask the user before moving `radar.db` aside; a fresh store is then created on the next run.
+- Config error: it names the file and key. Fix `settings.toml`; the message never contains values.
 
 ## Changing code
 

@@ -17,7 +17,8 @@ from . import db
 from .config import TZ, now_iso
 from .research import metrics
 from .research.ingest import InputError, add_link_event, current_links, entity_exists, load_model
-from .research.models import (DEEP_SECTIONS, DEFAULT_DIRECTION, DIMENSIONS, AssessmentFile, FeedbackFile)
+from .research.models import (DEEP_SECTIONS, DEFAULT_DIRECTION, DIMENSIONS, AssessmentFile, FeedbackFile,
+                               check_link, split_link_value)
 from .text import ASSESSABLE, keyword_key, parse_ref, ref
 
 KEY_DECISIONS = ("build", "validate")
@@ -184,7 +185,7 @@ def ingest_assessments(conn: sqlite3.Connection, path: Path, day: date) -> dict:
             if a.tracked:
                 pts = metrics.tracked_points(conn, a.tracked.model_dump(), ent, until=now_iso())
                 if pts:
-                    baseline = {"at": pts[-1].at, "value": pts[-1].value}
+                    baseline = {"at": pts[-1].at, "value": pts[-1].value, "ident": pts[-1].ident}
             snapshot = {"facts": facts, "tracked": a.tracked.model_dump() if a.tracked else None,
                         "baseline": baseline, "frozen_at": now_iso(), "notes": af.notes}
             db.insert(conn, "assessments", {
@@ -211,12 +212,11 @@ def ingest_feedback(conn: sqlite3.Connection, inbox: Path, day: date) -> dict:
                 problems.append(f"{path.name}: {ent} is not defined")
                 continue
             target = relation = ""
-            if f.field in ("link_add", "link_remove"):
-                relation, _, raw = f.value.partition("->")
-                try:
-                    target = ref(*parse_ref(raw.strip()))
-                except ValueError as e:
-                    problems.append(f"{path.name}: {e}")
+            if f.field in ("link_add", "link_remove"):  # FeedbackIn already ran check_link
+                relation, raw = split_link_value(f.value)
+                ent, target = check_link(ent, raw, relation)
+                if not entity_exists(conn, target):
+                    problems.append(f"{path.name}: link target {target} is not defined")
                     continue
             fp = db.sha([ent, f.field, f.value, f.reason, f.author, f.at.isoformat()])
             if db.one(conn, "SELECT 1 FROM feedback WHERE fingerprint=?", (fp,)):
@@ -233,7 +233,7 @@ def ingest_feedback(conn: sqlite3.Connection, inbox: Path, day: date) -> dict:
                                              "old_value": old, "new_value": f.value, "reason": f.reason,
                                              "author": f.author, "source_file": path.name, "fingerprint": fp})
                 if target:
-                    add_link_event(conn, ent, target, relation.strip(),
+                    add_link_event(conn, ent, target, relation,
                                    "add" if f.field == "link_add" else "remove", f"human:{f.author}", f.reason, day)
             stats["applied"] += 1
     if problems:
@@ -241,12 +241,13 @@ def ingest_feedback(conn: sqlite3.Connection, inbox: Path, day: date) -> dict:
     return stats
 
 
-def tracked_latest(conn: sqlite3.Connection, state: dict, as_of: date) -> float | None:
+def tracked_point(conn: sqlite3.Connection, state: dict, as_of: date) -> metrics.Point | None:
+    """Latest observation of the state's tracked series up to `as_of`, with its measurement identity."""
     tr = state["body"].get("tracked")
     if not tr:
         return None
     pts = metrics.tracked_points(conn, tr, state["entity"], until=_end_of(as_of))
-    return pts[-1].value if pts else None
+    return pts[-1] if pts else None
 
 
 def day_window(day: date, days: int) -> tuple[date, date]:
