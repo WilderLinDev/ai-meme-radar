@@ -1,0 +1,38 @@
+[
+  {
+    "source": "meme_pack_2026-11-10_run2.json",
+    "note": "荷兰 Creative Center 页跳转到美国，9 区实际只有 8 区。"
+  },
+  {
+    "source": "meme_pack_2026-11-10_run2.json",
+    "note": "Top100 的 rank_change 全部为空，NEW/fade 只是 7 日 vs 30 日是否上榜的代理。"
+  },
+  {
+    "source": "meme_pack_2026-11-10_run2.json",
+    "note": "CC 曲线最后一天是 2026-11-07，不是报告日；悬疑比赛曲线只有 10/19–11/7。"
+  },
+  {
+    "source": "meme_pack_2026-11-10_run2.json",
+    "note": "详情页没有兴趣、相关话题、创作者；相关视频没有公开链接，只有内部 VideoID。国家/地区是人气指数，不是百分比。"
+  },
+  {
+    "source": "meme_pack_2026-11-10_run2.json",
+    "note": "ViralRemix 11/10 看板在晚间重抓时仍盖着 02:24 UTC 的戳，只能当未满日快照，不参与峰值计算。"
+  },
+  {
+    "source": "meme_pack_2026-11-10_run2.json",
+    "note": "本 run 没有浏览器，未能打开 TikTok/Instagram 监控号格子、也未能刷新二创播放和分享数、未能复核 CapCut 用量。二创样本沿用今日早先已核实行。"
+  },
+  {
+    "source": "meme_pack_2026-11-10_run2.json",
+    "note": "正式监控账号尚未圈选，watchlist.csv 不存在。"
+  },
+  {
+    "source": "meme_pack_2026-11-10_run2.json",
+    "note": "回测的首批对/错判断要到 2026-11-13 才出现。"
+  },
+  {
+    "source": "meme_pack_2026-11-10_run2.json",
+    "note": "X 没有 30 日归档计数；Google Trends 未重试。"
+  }
+]

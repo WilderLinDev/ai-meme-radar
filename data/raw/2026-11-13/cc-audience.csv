@@ -1,0 +1,113 @@
+hashtag,region,period,dimension,bucket,value,unit
+entiende,DE,30,age,18-24,81.1,pct
+entiende,DE,30,age,25-34,14.54,pct
+entiende,DE,30,age,>=35,4.36,pct
+entiende,DE,30,country,Spain,672.35,index
+entiende,DE,30,country,The United States,502.05,index
+entiende,DE,30,country,Argentina,386.53,index
+entiende,DE,30,country,Italy,369.84,index
+entiende,DE,30,country,Colombia,269.62,index
+entiende,DE,7,age,18-24,79.47,pct
+entiende,DE,7,age,25-34,15.77,pct
+entiende,DE,7,age,>=35,4.76,pct
+entiende,DE,7,country,Spain,560.63,index
+entiende,DE,7,country,The United States,445.72,index
+entiende,DE,7,country,Argentina,440.86,index
+entiende,DE,7,country,Italy,388.32,index
+entiende,DE,7,country,Colombia,285.55,index
+meimei,CA,30,age,18-24,75.65,pct
+meimei,CA,30,age,25-34,19.7,pct
+meimei,CA,30,age,>=35,4.65,pct
+meimei,CA,30,country,The United States,745.77,index
+meimei,CA,30,country,Canada,362.44,index
+meimei,CA,30,country,Australia,245.17,index
+meimei,CA,30,country,United Kingdom,241.63,index
+meimei,CA,30,country,Philippines,178.41,index
+meimei,CA,7,age,18-24,75.35,pct
+meimei,CA,7,age,25-34,19.48,pct
+meimei,CA,7,age,>=35,5.17,pct
+meimei,CA,7,country,The United States,972.47,index
+meimei,CA,7,country,Canada,506.84,index
+meimei,CA,7,country,United Kingdom,331.9,index
+meimei,CA,7,country,Philippines,238.46,index
+meimei,CA,7,country,Germany,234.78,index
+housewife,US,30,age,18-24,65.13,pct
+housewife,US,30,age,25-34,28.97,pct
+housewife,US,30,age,>=35,5.9,pct
+housewife,US,30,country,The United States,560.34,index
+housewife,US,30,country,Canada,532.21,index
+housewife,US,30,country,Australia,529.44,index
+housewife,US,30,country,United Kingdom,375.67,index
+housewife,US,30,country,Singapore,295.67,index
+a2olite,JP,30,age,18-24,39.09,pct
+a2olite,JP,30,age,25-34,43.45,pct
+a2olite,JP,30,age,>=35,17.46,pct
+a2olite,JP,30,country,South Korea,1842.79,index
+a2olite,JP,30,country,Taiwan,552.88,index
+a2olite,JP,30,country,Japan,449.46,index
+a2olite,JP,30,country,Thailand,252.8,index
+a2olite,JP,30,country,Malaysia,153.82,index
+a2olite,JP,7,age,18-24,39.56,pct
+a2olite,JP,7,age,25-34,42.47,pct
+a2olite,JP,7,age,>=35,17.97,pct
+a2olite,JP,7,country,Japan,957.48,index
+a2olite,JP,7,country,Thailand,365.3,index
+a2olite,JP,7,country,The United States,228.03,index
+a2olite,JP,7,country,Indonesia,211.71,index
+imsosorry,US,30,age,18-24,65.75,pct
+imsosorry,US,30,age,25-34,26.47,pct
+imsosorry,US,30,age,>=35,7.78,pct
+imsosorry,US,30,country,The United States,900.46,index
+imsosorry,US,30,country,Canada,566.64,index
+imsosorry,US,30,country,Australia,520.93,index
+imsosorry,US,30,country,United Kingdom,517.39,index
+imsosorry,US,30,country,Germany,200.35,index
+angelofmydreams,US,30,age,18-24,56.5,pct
+angelofmydreams,US,30,age,25-34,36.92,pct
+angelofmydreams,US,30,age,>=35,6.58,pct
+angelofmydreams,US,30,country,United Kingdom,829.57,index
+angelofmydreams,US,30,country,Canada,651.61,index
+angelofmydreams,US,30,country,The United States,638.4,index
+angelofmydreams,US,30,country,Australia,608.99,index
+angelofmydreams,US,30,country,Philippines,332.21,index
+halloweentransition,US,30,age,18-24,64.04,pct
+halloweentransition,US,30,age,25-34,26.26,pct
+halloweentransition,US,30,age,>=35,9.7,pct
+halloweentransition,US,30,country,The United States,862.47,index
+halloweentransition,US,30,country,Canada,728.47,index
+halloweentransition,US,30,country,Australia,559.08,index
+halloweentransition,US,30,country,United Kingdom,413.29,index
+halloweentransition,US,30,country,Germany,203.73,index
+mandem,GB,30,age,18-24,64.09,pct
+mandem,GB,30,age,25-34,23.66,pct
+mandem,GB,30,age,>=35,12.25,pct
+mandem,GB,30,country,United Kingdom,2306.54,index
+mandem,GB,30,country,Australia,880.36,index
+mandem,GB,30,country,The United States,408.93,index
+mandem,GB,7,age,18-24,65.88,pct
+mandem,GB,7,age,25-34,23.25,pct
+mandem,GB,7,age,>=35,10.87,pct
+mandem,GB,7,country,United Kingdom,3467.43,index
+damehombro,US,30,age,18-24,30.85,pct
+damehombro,US,30,age,25-34,43.82,pct
+damehombro,US,30,age,>=35,25.33,pct
+damehombro,US,30,country,Colombia,1219.34,index
+damehombro,US,30,country,Spain,641.01,index
+damehombro,US,30,country,The United States,498.24,index
+damehombro,US,30,country,Argentina,308.54,index
+damehombro,US,30,country,Mexico,198.74,index
+lastchristmas,US,30,age,18-24,69.0,pct
+lastchristmas,US,30,age,25-34,25.73,pct
+lastchristmas,US,30,age,>=35,5.27,pct
+lastchristmas,US,30,country,The United States,800.04,index
+lastchristmas,US,30,country,United Kingdom,724.04,index
+lastchristmas,US,30,country,Germany,384.24,index
+lastchristmas,US,30,country,Mexico,178.79,index
+lastchristmas,US,30,country,Philippines,101.01,index
+lastchristmas,US,7,age,18-24,69.63,pct
+lastchristmas,US,7,age,25-34,25.42,pct
+lastchristmas,US,7,age,>=35,4.95,pct
+lastchristmas,US,7,country,The United States,825.37,index
+lastchristmas,US,7,country,United Kingdom,677.91,index
+lastchristmas,US,7,country,Germany,405.25,index
+lastchristmas,US,7,country,Mexico,217.89,index

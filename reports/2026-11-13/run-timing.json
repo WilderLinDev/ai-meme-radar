@@ -1,0 +1,110 @@
+{
+  "date": "2026-11-13",
+  "events": [
+    {
+      "at": "2026-11-13T12:50:14+08:00",
+      "commit": "5fb34de",
+      "stage": "raw-snapshots",
+      "event": "checked",
+      "note": "all present"
+    },
+    {
+      "at": "2026-11-13T12:50:14+08:00",
+      "commit": "5fb34de",
+      "stage": "check",
+      "event": "start"
+    },
+    {
+      "at": "2026-11-13T12:50:14+08:00",
+      "commit": "5fb34de",
+      "stage": "check",
+      "event": "done",
+      "seconds": 0.14,
+      "rc": 0
+    },
+    {
+      "at": "2026-11-13T12:50:14+08:00",
+      "commit": "5fb34de",
+      "stage": "ingest",
+      "event": "start"
+    },
+    {
+      "at": "2026-11-13T12:50:14+08:00",
+      "commit": "5fb34de",
+      "stage": "ingest",
+      "event": "done",
+      "seconds": 0.16,
+      "rc": 0
+    },
+    {
+      "at": "2026-11-13T12:50:14+08:00",
+      "commit": "5fb34de",
+      "stage": "scaffold",
+      "event": "skipped",
+      "note": "judgments.json exists"
+    },
+    {
+      "at": "2026-11-13T12:50:14+08:00",
+      "commit": "5fb34de",
+      "stage": "build",
+      "event": "start"
+    },
+    {
+      "at": "2026-11-13T12:50:16+08:00",
+      "commit": "5fb34de",
+      "stage": "build",
+      "event": "done",
+      "seconds": 2.25,
+      "rc": 0
+    },
+    {
+      "at": "2026-11-13T12:50:17+08:00",
+      "commit": "5fb34de",
+      "stage": "raw-snapshots",
+      "event": "checked",
+      "note": "all present"
+    },
+    {
+      "at": "2026-11-13T12:50:17+08:00",
+      "commit": "5fb34de",
+      "stage": "check",
+      "event": "start"
+    },
+    {
+      "at": "2026-11-13T12:50:17+08:00",
+      "commit": "5fb34de",
+      "stage": "check",
+      "event": "done",
+      "seconds": 0.15,
+      "rc": 0
+    },
+    {
+      "at": "2026-11-13T12:50:17+08:00",
+      "commit": "5fb34de",
+      "stage": "ingest",
+      "event": "start"
+    },
+    {
+      "at": "2026-11-13T12:50:17+08:00",
+      "commit": "5fb34de",
+      "stage": "ingest",
+      "event": "done",
+      "seconds": 0.17,
+      "rc": 0
+    },
+    {
+      "at": "2026-11-13T12:50:17+08:00",
+      "commit": "5fb34de",
+      "stage": "scaffold",
+      "event": "skipped",
+      "note": "judgments.json exists"
+    },
+    {
+      "at": "2026-11-13T12:50:17+08:00",
+      "commit": "5fb34de",
+      "stage": "build",
+      "event": "skipped",
+      "note": "meme-pack.json is newer than its inputs"
+    }
+  ]
+}

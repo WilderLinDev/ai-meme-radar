@@ -1,0 +1,95 @@
+{
+  "as_of": "2026-11-13",
+  "counts": {
+    "backtest": {
+      "make:insufficient": 3,
+      "make:miss": 2,
+      "make:pending": 1,
+      "skip:insufficient": 9,
+      "skip:pending": 17,
+      "watch:hit": 1,
+      "watch:insufficient": 11,
+      "watch:pending": 17
+    },
+    "backtest_summary": "截至 2026-11-13，「做」命中率 0%（对 0 / 错 2，待定 1，数据不足 3，连续推荐不重复计 0）。观望/不做漏判率 0%（漏判 0 / 未漏判 1，待定 34，数据不足 20）。",
+    "existing_rows_kept_over_migrated": 0,
+    "migrated_rows_by_date": {
+      "2026-11-10": 26,
+      "2026-11-13": 35
+    },
+    "old_tracker_by_date": {
+      "2026-11-10": 26,
+      "2026-11-13": 38
+    },
+    "quarantine_raw": 6996,
+    "quarantine_raw_by_reason": {
+      "cc_detail_period_without_data": 5,
+      "earlier_same_day_capture_conflict(later capture used)": 12,
+      "earlier_same_day_curve_capture(later capture used whole)": 176,
+      "heat_cc_index_copy_not_used(cc from cc-curves capture)": 169,
+      "no_value(status=not found)": 10,
+      "non_numeric_value_or_bad_date/complete": 32,
+      "not_in_old_top_sample": 155,
+      "original_not_remix": 28,
+      "unmapped_meme": 6384,
+      "watchlist_meme_unmapped(row kept, meme_id empty)": 25
+    },
+    "quarantine_tracker": 3,
+    "quarantine_tracker_by_reason": {
+      "cc basis mismatch": 3
+    },
+    "raw_written": {
+      "2026-11-10/cc-curves.csv": 669,
+      "2026-11-10/cc-top100.csv": 1600,
+      "2026-11-10/gaps.json": 9,
+      "2026-11-10/heat.csv": 375,
+      "2026-11-10/remixes.csv": 94,
+      "2026-11-11/heat.csv": 650,
+      "2026-11-12/cc-curves.csv": 30,
+      "2026-11-12/heat.csv": 907,
+      "2026-11-13/cc-audience.csv": 112,
+      "2026-11-13/cc-curves.csv": 335,
+      "2026-11-13/cc-top100.csv": 1600,
+      "2026-11-13/gaps.json": 28,
+      "2026-11-13/heat.csv": 1035,
+      "2026-11-13/remixes.csv": 235,
+      "2026-11-13/watchlist-posts.csv": 180
+    },
+    "tracker_by_date_after_merge": {
+      "2026-11-10": 26,
+      "2026-11-13": 35
+    }
+  },
+  "inputs_sha256": {
+    "/workspace/lark/cc_hashtag_detail_2026-11-10.json": "faf00ca5adea0cae6142c2b3a408fb1cdb0d7b9b498cab21cc9e91212c9b9616",
+    "/workspace/lark/cc_hashtag_detail_2026-11-13.json": "3c450558d67a35f7fe447d36a92fd0a27dffa213b7ce8431984c814fda180e9f",
+    "/workspace/lark/cc_hashtag_trends_2026-11-10.csv": "8b4cdf632827df2527be28851c493c45d1f102bb1d1fadbe078fcab261892625",
+    "/workspace/lark/cc_hashtag_trends_2026-11-10_run2.csv": "7b794f3a32205f2eac8eab1554906fcd6779761866b5c38ca2b711ed1f662907",
+    "/workspace/lark/cc_hashtag_trends_2026-11-12.csv": "010d6a265fe4121c1486895f4ef9a14e2469aba0fdf32a74a3058fa855f925e2",
+    "/workspace/lark/cc_hashtag_trends_2026-11-13.csv": "648d328ffdf76bff5e52389a097d04b63a29139abbc49daeb641998a2d584233",
+    "/workspace/lark/heat_2026-11-10.csv": "ffdc21a563f9a4746edcc50cd21f3b8b3e08ec8f28f21e8bf1b7667e8f15cead",
+    "/workspace/lark/heat_2026-11-10_run2.csv": "447c947ae2c416c9315e671548ed15fc4ce5e9e79441fc14271966cef5967e6e",
+    "/workspace/lark/heat_2026-11-11.csv": "57519cbede658c38110df238238479cb0b75718e6bfbec74db6d0dea009e04e5",
+    "/workspace/lark/heat_2026-11-12.csv": "88b86513801e7ca9052bdce6bf4b34ef4ec6641f64bdaa0e54bd418494102bd0",
+    "/workspace/lark/heat_2026-11-13.csv": "76d6e1f1aa4465ab47669ca9b10ccf28e6ea993b46987a93ad6ae0cfec19a401",
+    "/workspace/lark/history/meme_daily_tracker.csv": "78b110745fb6dc7874e2b2c27933c4834c7497f1abeaa14a167c1f205ddf27e9",
+    "/workspace/lark/meme_pack_2026-11-10.json": "6c158ff4d69e8f9d23f8cb22cc24f65d67e451619e58d4201711af7f105f891c",
+    "/workspace/lark/meme_pack_2026-11-10_run2.json": "a3448852be7737c66f3a05e5c986ba923a001bc2d0426b8e61f3af80b0b41fa1",
+    "/workspace/lark/meme_pack_2026-11-13.json": "89ed1186f9c0895d6f481267a4a0802c42a2f70c8c0f6332250773bf61f177d7",
+    "/workspace/lark/remix_stats_2026-11-10_run2.csv": "16b3f028ee8768763e97332dc7781f01f632e9e9059c9cbe65dd8da229f04418",
+    "/workspace/lark/remix_stats_2026-11-13.csv": "e2c9c8b7f0d654547fafa8c5af0430f09519d24e4d138eb7ed243c004ebd3b84",
+    "/workspace/lark/watchlist_posts_2026-11-13.csv": "85eb5276700510bb85c154c939bc4644a95265c0bf40a34695dd9cc3481e1e85",
+    "/workspace/tiktok_cc/2026-11-10_NewsEnt_top100_all.csv": "0bfcb36170f265ad62a3e47ef117dfe0c31859a386fb2af7d26136d80feeaf61",
+    "/workspace/tiktok_cc/2026-11-13_NewsEnt_top100_all.csv": "d58d0cb95b8afe7f9416d5d149537009bfcab21d961b23484571f5ab4685d5b5"
+  },
+  "not_used": [
+    "heat_*.json (JSON twins of heat CSVs)",
+    "cc_hashtag_trends_*_merged.csv (mixes captures)",
+    "history/backtest_latest.* (old conclusions, reference only)"
+  ],
+  "superseded_files": [
+    "cc_hashtag_trends_2026-11-10.csv (cc curves 2026-11-10: per-curve, later capture wins)",
+    "heat_2026-11-10.csv (heat 2026-11-10: superseded by heat_2026-11-10_run2.csv)",
+    "remix_stats_2026-11-10.csv (remixes 2026-11-10: superseded by remix_stats_2026-11-10_run2.csv)"
+  ]
+}

@@ -1,0 +1,62 @@
+date,meme_id,name,part,verdict,suggested_verdict,total,heat,trend,share,competition,window,primary_metric,primary_value,primary_date,share_median,share_n,ignite_date,days_hot,peak_status,cc_regions
+2026-11-10,a2olite,#a2olite,main,skip,skip,41,10,6,6,11,8,cc_index_30d,73.2,2026-11-07,,,,,declining,"JP,KR"
+2026-11-10,angelofmydreams,#angelofmydreams,main,skip,skip,32,9,3,6,10,4,cc_index_30d,83.2,2026-11-07,,,,,declining,"GB,US"
+2026-11-10,ba-ba-ba,Ba Ba Ba Dance,main,watch,watch,55,20,13,5,11,6,viralremix_new_videos,46700,2026-11-09,0.00385,10,2026-10-02,39,near_peak,
+2026-11-10,bicep-heart,Bicep Heart,main,watch,watch,58,16,7,15,12,8,x_posts,13809,2026-11-09,0.01917,10,2026-10-30,11,declining,
+2026-11-10,can-i-ride,Can I Ride,main,make,make,65,16,13,6,18,12,viralremix_new_videos,24300,2026-11-09,0.00435,10,2026-10-09,32,near_peak,
+2026-11-10,cat-ultra-bee,Cat on Ultra Bee,main,make,make,76,11,15,19,16,15,none,,,0.03768,6,2026-11-05,5,unknown,
+2026-11-10,damehombro,#damehombro,main,skip,skip,35,11,3,6,10,5,cc_index_30d,70,2026-11-07,,,2026-10-10,31,declining,US
+2026-11-10,deck-the-halls,Deck the Halls Dance,early,watch,watch,55,10,10,6,15,14,none,,,,,,,unknown,
+2026-11-10,flamingo-float,Flamingo Float,main,watch,watch,45,11,8,9,9,8,none,,,0.00701,10,2026-11-02,8,unknown,
+2026-11-10,flower-bouquet-with-face,Flower Bouquet With Face,early,watch,watch,50,8,16,6,11,9,viralremix_new_videos,158,2026-11-09,,,,,unknown,
+2026-11-10,grandpa-fish,Grandpa Fish,main,skip,skip,33,10,9,7,4,3,none,,,0.00569,10,,,unknown,
+2026-11-10,halloweentransition,#halloweentransition,main,skip,skip,27,10,1,6,8,2,cc_index_30d,7.4,2026-11-06,,,,,declining,"AU,CA,DE,GB,US"
+2026-11-10,housewife,#housewife,main,skip,skip,35,12,3,6,9,5,cc_index_30d,50.5,2026-11-07,,,,,declining,"AU,CA,DE,FR,GB,US"
+2026-11-10,imsosorry,#imsosorry,main,skip,skip,36,11,3,6,11,5,cc_index_30d,56,2026-11-07,,,2026-10-16,25,declining,"AU,CA,GB,US"
+2026-11-10,lastchristmas,#lastchristmas,main,make,make,67,16,13,6,14,18,cc_index_30d,94.2,2026-11-07,,,,,near_peak,"CA,DE,GB,US"
+2026-11-10,malfoid,Malfoid,main,skip,skip,34,18,3,10,2,1,x_posts,32996,2026-11-09,,,,,declining,
+2026-11-10,mandem,#mandem,main,skip,skip,30,5,3,6,12,4,cc_index_30d,57.4,2026-11-07,,,,,declining,"AU,GB"
+2026-11-10,meimei,#meimei,main,watch,watch,53,8,15,6,12,12,cc_index_30d,99.4,2026-11-07,,,,,near_peak,"CA,DE,FR,GB"
+2026-11-10,pet-rock,Pet Rock Dance,early,watch,skip,44,7,14,6,8,9,viralremix_new_videos,,,,,,,unknown,
+2026-11-10,pimpwalk,Pimpwalk Entrance,early,watch,skip,43,5,12,6,12,8,viralremix_new_videos,,,,,,,unknown,
+2026-11-10,police-chase-ai,Police Chase AI,early,watch,skip,42,6,13,6,9,8,viralremix_new_videos,,,,,,,unknown,
+2026-11-10,shaking-head,Shaking Head,early,make,make,71,9,17,16,17,12,viralremix_new_videos,486,2026-11-09,0.02177,8,,,rising,
+2026-11-10,shoulder-carry,Shoulder Carry,main,make,make,66,16,10,10,18,12,viralremix_new_videos,27600,2026-11-09,0.00836,10,,,unknown,
+2026-11-10,then-i-walk-in,Then I Walk In,early,watch,watch,57,8,15,10,16,8,viralremix_new_videos,152,2026-11-09,0.00858,10,,,rising,
+2026-11-10,turning-mom,Turning My Mom Into Me,early,watch,skip,38,7,10,6,8,7,viralremix_new_videos,135,2026-11-09,,,,,rising,
+2026-11-10,winter-horror,冬日恐悚 / 悬疑反转,main,watch,watch,49,13,3,6,15,12,cc_index_30d,50.9,2026-11-07,,,,,declining,"DE,GB,US"
+2026-11-13,aint-you-my-gangsta,Ain't You My Gangsta B,main,make,make,65,9,17,12,14,13,viralremix_new_videos,1500,2026-11-13,0.01137,10,2026-10-29,15,rising,
+2026-11-13,angelofmydreams,#angelofmydreams,main,skip,skip,30,9,5,2,10,4,cc_index_30d,77,2026-11-10,0.00233,10,2026-10-12,32,declining,"GB,US"
+2026-11-13,ba-ba-ba,Ba Ba Ba Dance,main,watch,watch,47,19,6,5,11,6,viralremix_new_videos,41600,2026-11-13,0.00383,10,2026-10-02,42,declining,
+2026-11-13,baby-doll-dance,Baby Doll Dance,main,skip,skip,34,12,6,2,8,6,viralremix_new_videos,5500,2026-11-13,0.00172,10,,,declining,
+2026-11-13,bicep-heart,Bicep Heart,main,watch,watch,54,17,5,13,12,7,x_posts,13961,2026-11-12,0.01735,10,2026-10-30,14,declining,
+2026-11-13,can-i-ride,Can I Ride,main,skip,skip,41,12,2,5,17,5,viralremix_new_videos,8900,2026-11-13,0.00483,10,2026-10-09,35,declining,
+2026-11-13,careless-whisper-car,Careless Whisper Car,early,watch,watch,47,4,8,6,17,12,x_posts,4,2026-11-12,,,,,declining,
+2026-11-13,cat-ultra-bee,Cat on Ultra Bee,main,watch,watch,61,10,9,16,15,11,none,,,0.02727,9,2026-11-05,8,unknown,
+2026-11-13,damehombro,#damehombro,main,skip,skip,28,8,1,6,10,3,cc_index_30d,10.7,2026-11-10,,,2026-10-10,34,declining,US
+2026-11-13,deck-the-halls,Deck the Halls Dance,early,watch,watch,53,10,10,6,10,17,none,,,0.00991,2,2026-11-03,10,unknown,
+2026-11-13,dog-grooming-time,Dog Grooming Time,early,watch,watch,53,9,8,6,15,15,x_posts,0,2026-11-12,,,2026-11-08,5,peak,
+2026-11-13,flamingo-float,Flamingo Float,main,watch,watch,48,6,15,9,9,9,none,,,0.00705,10,2026-11-02,11,unknown,
+2026-11-13,flower-bouquet-with-face,Flower Bouquet With Face,early,skip,skip,26,4,3,6,9,4,viralremix_new_videos,1400,2026-11-10,,,2026-11-06,7,rising,
+2026-11-13,grandpa-fish,Grandpa Fish,main,skip,skip,29,9,8,5,4,3,none,,,0.00564,10,2026-11-03,10,unknown,
+2026-11-13,grinch-pet-filter,Grinch Pet Filter,main,skip,watch,47,13,3,13,4,14,viralremix_new_videos,6500,2026-11-13,0.01169,10,2026-11-03,10,declining,
+2026-11-13,halloweentransition,#halloweentransition,main,skip,skip,19,4,0,6,8,1,cc_index_30d,0.4,2026-11-10,,,2026-10-09,35,declining,"AU,CA,DE,GB,US"
+2026-11-13,housewife,#housewife,main,skip,skip,29,9,2,5,9,4,cc_index_30d,40.8,2026-11-10,0.00437,10,2026-10-15,29,declining,"AU,CA,DE,FR,GB,US"
+2026-11-13,imsosorry,#imsosorry,main,skip,skip,32,9,2,6,11,4,cc_index_30d,49.8,2026-11-10,,,2026-10-16,28,declining,"AU,CA,GB,US"
+2026-11-13,kitten-parade,Kitten Parade Meme,main,watch,watch,60,9,14,13,11,13,viralremix_new_videos,1400,2026-11-13,0.01386,10,2026-11-05,8,unknown,
+2026-11-13,lastchristmas,#lastchristmas,main,watch,watch,49,12,3,6,14,14,cc_index_30d,79.9,2026-11-10,,,2026-10-21,23,declining,"CA,DE,GB,US"
+2026-11-13,malfoid,Malfoid,main,skip,skip,37,18,6,10,2,1,x_posts,36243,2026-11-12,,,2026-09-22,52,declining,
+2026-11-13,pet-rock,Pet Rock Dance,early,watch,skip,43,6,5,16,8,8,viralremix_new_videos,480,2026-11-13,0.02611,10,2026-11-01,12,declining,
+2026-11-13,pimpwalk,Pimpwalk Entrance,early,watch,watch,50,5,12,13,11,9,viralremix_new_videos,120,2026-11-12,0.01160,9,2026-10-17,27,rising,
+2026-11-13,police-chase-ai,Police Chase AI,early,skip,skip,31,5,6,5,9,6,viralremix_new_videos,357,2026-11-13,0.00581,10,2026-11-01,12,declining,
+2026-11-13,rubber-band-prank,Rubber Band Prank,early,watch,skip,44,9,7,6,12,10,x_posts,0,2026-11-12,,,2026-11-06,7,peak,
+2026-11-13,santa-nice-list,Santa Nice List,main,watch,watch,46,7,5,6,13,15,viralremix_new_videos,694,2026-11-13,0.00973,1,2026-11-05,8,declining,
+2026-11-13,shaking-head,Shaking Head,early,watch,watch,53,6,6,16,16,9,viralremix_new_videos,390,2026-11-12,0.02407,9,2026-10-19,25,declining,
+2026-11-13,shoulder-carry,Shoulder Carry,main,watch,watch,51,14,3,10,16,8,viralremix_new_videos,14800,2026-11-13,0.00831,10,2026-07-22,114,declining,
+2026-11-13,talk-to-me-doja,Talk To Me Doja,early,skip,watch,45,5,14,13,5,8,viralremix_new_videos,215,2026-11-13,0.01933,10,2026-11-07,6,unknown,
+2026-11-13,then-i-walk-in,Then I Walk In,early,skip,skip,42,6,5,10,15,6,viralremix_new_videos,86,2026-11-11,0.00834,10,2026-10-18,26,declining,
+2026-11-13,turning-mom,Turning My Mom Into Me,early,skip,skip,22,4,2,5,8,3,viralremix_new_videos,57,2026-11-11,0.00529,9,2026-10-31,13,declining,
+2026-11-13,waist-heart,Waist Heart Trend,main,watch,watch,57,9,16,6,13,13,x_posts,770,2026-11-12,0.02973,3,2026-11-03,10,rising,
+2026-11-13,winter-horror,冬日恐悚 / 悬疑反转,main,skip,skip,42,10,3,6,15,8,cc_index_30d,50.9,2026-11-07,,,2026-10-10,34,declining,"DE,GB,US"
+2026-11-13,y-entiende-corazon,Y Entiende Corazón Trend,main,skip,skip,44,16,6,6,8,8,viralremix_new_videos,25300,2026-11-13,0.00519,10,2026-10-23,21,declining,"DE,FR,US"
+2026-11-13,you-never-let-her-pay,You Never Let Her Pay,early,watch,watch,58,11,8,6,17,16,x_posts,1,2026-11-12,,,2026-11-10,3,declining,

@@ -35,11 +35,15 @@ Ask only for what `radar check` lists under Ask, or for a login or authorisation
 src/radar/         the package (cli, config, registry, raw, analysis, scoring, pack,
                    tracker, backtest, render, export)
 tests/             pytest; tests/fixtures/2026-11-10 is the golden sample
+scripts/           run_day.py (code stages with resume + reports/DAY/run-timing.json);
+                   one-off pre-radar migration helpers (migrate_history, register_from_pack,
+                   judgments_from_pack)
 config/            watchlist.csv, lark-base.json, settings.example.toml
 data/memes.csv     meme registry (identity, hashtags, primary heat metric)
 data/raw/DAY/      raw snapshots, written once
 data/tracker.csv   one row per meme per report day
 data/backtest.*    latest backtest of every verdict
+data/legacy/       pre-radar records that could not be migrated, with reasons (ADR 0004)
 reports/DAY/       judgments.json (yours), meme-pack.json, daily-report.md/.docx, charts
 ```
 

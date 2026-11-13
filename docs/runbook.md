@@ -14,6 +14,8 @@ uv sync
 uv run radar check
 ```
 
+`uv run python scripts/run_day.py run $D` runs check, ingest, scaffold and build in order, reuses what is done (scaffold is skipped once `judgments.json` exists, build when its outputs are newer than its inputs) and appends every stage to `reports/$D/run-timing.json`. Log agent stages with `uv run python scripts/run_day.py mark $D <stage> start|done|failed --note "..."` (cc-lists, cc-details, watchlist, heat, remixes, judgments, chat, git-push, wiki, base-sync); `status $D` shows which raw snapshots exist and the last event of each stage.
+
 Read Present / Ask / Skipped. Ask only for an item under Ask, or one that a live pull rejects, and say what it unlocks and which step you skip without it. Do not ask about scope.
 
 Set `D=YYYY-MM-DD` (today, Asia/Shanghai). Everything collected today goes into `data/raw/$D/`. Run `uv run radar schema` for every file's columns.
