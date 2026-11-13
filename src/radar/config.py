@@ -24,9 +24,9 @@ from __future__ import annotations
 import os
 import re
 import tomllib
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
-from datetime import date, datetime
+from datetime import date, datetime, time
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
@@ -46,12 +46,30 @@ COVERAGE_SOURCES = (*SOCIAL_PLATFORMS, "Creative Center", "Watchlist")
 GEFEI_BASE_URL = "https://seo.web.cafe"
 
 
+_clock: Callable[[], datetime] | None = None  # tests install a fake clock with set_clock()
+
+
+def set_clock(fn: Callable[[], datetime] | None) -> None:
+    global _clock
+    _clock = fn
+
+
+def now() -> datetime:
+    """Wall-clock time in Asia/Shanghai. Every ingestion timestamp comes from here."""
+    return _clock() if _clock else datetime.now(TZ)
+
+
 def today() -> date:
-    return datetime.now(TZ).date()
+    return now().date()
+
+
+def end_of(day: date) -> str:
+    """The historical cutoff of a report day: its last second, as an ingestion timestamp to compare with."""
+    return datetime.combine(day, time(23, 59, 59), TZ).isoformat()
 
 
 def now_iso() -> str:
-    return datetime.now(TZ).isoformat(timespec="seconds")
+    return now().isoformat(timespec="seconds")
 
 
 # Environment variables that override settings.toml (the only env vars the app reads).

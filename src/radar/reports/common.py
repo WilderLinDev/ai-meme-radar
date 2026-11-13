@@ -3,7 +3,6 @@ from __future__ import annotations
 
 import json
 import sqlite3
-from datetime import date
 from pathlib import Path
 
 from .. import db
@@ -86,15 +85,16 @@ def write_report(conn: sqlite3.Connection, key: str, kind: str, day: str, entity
     return True
 
 
-def evidence_rows(conn: sqlite3.Connection, entities: list[str], as_of: date, per_entity: int = 12) -> list[str]:
+def evidence_rows(conn: sqlite3.Connection, entities: list[str], available_by: str,
+                  per_entity: int = 12) -> list[str]:
     """Evidence ledger for exactly these entities (latest `per_entity` each), in the given entity order.
 
-    Only evidence ingested on or before research day `as_of` (back-dated collection times don't count).
+    Only evidence ingested by the timestamp `available_by` (an early collected_at does not count).
     """
     rows = []
     for ent in entities:
-        rows += db.rows(conn, "SELECT * FROM evidence WHERE entity=? AND day <= ?"
-                              " ORDER BY collected_at DESC, id DESC LIMIT ?", (ent, as_of.isoformat(), per_entity))
+        rows += db.rows(conn, "SELECT * FROM evidence WHERE entity=? AND ingested_at <= ?"
+                              " ORDER BY collected_at DESC, id DESC LIMIT ?", (ent, available_by, per_entity))
     if not rows:
         return ["暂无已入库的证据。"]
     out = ["| 引用 | 对象 | 渠道 | 来源 | 指标 | 数值 | 地区 | 样本 | 采集时间 | 标注 | 可信度 | 口径 |",

@@ -5,7 +5,7 @@ from datetime import timedelta
 
 from radar import db, lark, pipeline
 from radar.config import LarkSettings
-from conftest import DAY1, DEEP, assessment, research_doc, write
+from conftest import DAY1, advance, DEEP, assessment, research_doc, write
 
 D2 = DAY1 + timedelta(days=1)
 
@@ -29,6 +29,7 @@ class FakeLark:
 
 
 def ctx(paths, conn, settings, fake, larkfake, day=DAY1):
+    advance(day)  # a run for `day` happens on `day`
     settings.lark = LarkSettings(enabled=True, daily_parent="wikiDaily", opportunity_parent="wikiOpp")
     return pipeline.Context(day=day, settings=settings, paths=paths, conn=conn, transport=fake,
                             lark_runner=larkfake, say=lambda s: None)

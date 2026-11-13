@@ -11,7 +11,7 @@ import sqlite3
 from datetime import date
 
 from .. import backtest, db
-from ..config import Paths
+from ..config import Paths, end_of
 from ..decisions import all_effective, is_key
 from ..research import metrics
 from ..research.ingest import current_links
@@ -52,9 +52,9 @@ def evidence_scope(ent: str, links) -> tuple[list[str], list[str]]:
 
 
 def render(conn: sqlite3.Connection, st: dict, day: date) -> str:
-    # Evidence and links: as they stood on the assessment day (what the judgment was frozen on).
-    # Feedback and backtests: as known by the report day.
-    frozen = date.fromisoformat(st["assessed_day"])
+    # Evidence and links: as ingested when this assessment revision was frozen (its created_at).
+    # Feedback and backtests: as ingested by the end of the report day.
+    frozen = st["created_at"]
     links = current_links(conn, as_of=frozen)
     ent = st["entity"]
     b = st["body"]
@@ -77,29 +77,29 @@ def render(conn: sqlite3.Connection, st: dict, day: date) -> str:
     for t in sorted(set(second)):
         out.append(f"- 经由格式关联的趋势：{name_of(conn, t)}")
     out += ["", "## 证据清单", "", f"范围：本机会、直接关联对象、经由格式关联的趋势，以及这些趋势/格式的关键词与网站；"
-            f"仅含 {frozen.isoformat()}（评估日）及之前入库的证据与关联。", ""]
-    out += evidence_rows(conn, scope, as_of=frozen) + [""]
+            f"仅含本次评估冻结（{frozen[:16]}）前入库的证据与关联。", ""]
+    out += evidence_rows(conn, scope, available_by=frozen) + [""]
     kws = [o.split(":", 1)[1] for o in scope if o.startswith("keyword:")]
     if kws:
         out += ["## 哥飞关键词序列", "", "| 关键词 | 点数 | 最新 heat_ratio | 前值 | 变化 | 峰值 | 距峰值 |",
                 "| --- | --- | --- | --- | --- | --- | --- |"]
         for kw in kws:
-            s = metrics.stats(kw, metrics.keyword_heat_series(conn, kw, as_of_day=frozen))
+            s = metrics.stats(kw, metrics.keyword_heat_series(conn, kw, available_by=frozen))
             if s:
                 out.append(f"| {cell(kw)} | {s.n} | {num(s.latest)} | {num(s.previous)} | {pct(s.change_pct)} |"
                            f" {num(s.peak)} | {pct(s.from_peak_pct)} |")
             else:
                 out.append(f"| {cell(kw)} | 0 | — | — | — | — | — |")
         out += ["", "heat_ratio 是哥飞相对 GPTs 基准词的热度倍数，不是搜索量【第三方读数】。", ""]
-    hist = db.rows(conn, "SELECT * FROM feedback WHERE entity=? AND ingested_day <= ? ORDER BY at, id",
-                   (ent, day.isoformat()))
+    hist = db.rows(conn, "SELECT * FROM feedback WHERE entity=? AND ingested_at <= ? ORDER BY ingested_at, id",
+                   (ent, end_of(day)))
     if hist:
         out += ["## 人工修改记录", ""]
         for f in hist:
             label = FIELD_ZH.get(f["field"], f["field"])
             out.append(f"- {f['at'][:16]} {f['author']}：{label} {f['old_value'] or ''} → {f['new_value']}（{f['reason']}）")
         out.append("")
-    bt = [dict(r, day=r["assessed_day"]) for r in backtest.official(conn, "f.entity=?", (ent,), as_of=day)]
+    bt = [dict(r, day=r["assessed_day"]) for r in backtest.official(conn, entity=ent, as_of=day)]
     if bt:
         out += [f"## 回测记录（截至 {day.isoformat()}）", "", "| 评估日 | 体系 | 基线 | 结果值 | 变化 | 结论 |", "| --- | --- | --- | --- | --- | --- |"]
         for r in bt:

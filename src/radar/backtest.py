@@ -17,7 +17,7 @@ import sqlite3
 from datetime import date, timedelta
 
 from . import db
-from .config import now_iso
+from .config import end_of, now_iso
 from .research import metrics
 
 LIFECYCLE_HORIZON = 7
@@ -28,48 +28,23 @@ SUPPORT_FLOOR = -0.10
 MISSED_RISE = 0.30
 
 
-# The official set: the final revision of each (day, entity). Results of superseded revisions stay
-# stored for audit but never count in summaries or resolutions.
-FINAL = ("SELECT a.* FROM assessments a JOIN (SELECT day, entity, MAX(revision) AS rev FROM assessments"
-         " GROUP BY day, entity) m ON a.day=m.day AND a.entity=m.entity AND a.revision=m.rev")
+def _final(cutoff: str | None) -> tuple[str, tuple]:
+    """Final revision per (day, entity) among revisions that existed at `cutoff` (created_at).
 
-
-def _judged(conn: sqlite3.Connection) -> list[dict]:
-    return db.rows(conn, FINAL + " ORDER BY a.day, a.entity")
-
-
-def official(conn: sqlite3.Connection, where: str = "", params: tuple = (), as_of: date | None = None) -> list[dict]:
-    """Backtest rows of final revisions only, joined with their assessment.
-
-    With `as_of`, only assessments made by that day, each shown as it stood that day: an outcome counts
-    as settled only if its observation had been ingested by then (`outcome_day <= as_of`); otherwise it
-    is pending, or no_data once the window had closed. The stored row itself is not changed.
+    The cutoff is applied before MAX(revision), so a revision added later never displaces the one a
+    historical report saw. Without a cutoff: the final revision known now.
     """
-    sql = (f"SELECT b.*, f.entity, f.day AS assessed_day, f.revision, f.lifecycle, f.decision"
-           f" FROM backtest_results b JOIN ({FINAL}) f ON f.id = b.assessment_id")
-    clauses, args = ([where] if where else []), list(params)
-    if as_of:
-        clauses.append("f.day <= ?")
-        args.append(as_of.isoformat())
-    out = db.rows(conn, sql + (" WHERE " + " AND ".join(clauses) if clauses else "")
-                  + " ORDER BY f.day, b.system, f.entity", args)
-    return [as_of_view(r, as_of) for r in out] if as_of else out
+    where, params = ("WHERE created_at <= ?", (cutoff,)) if cutoff else ("", ())
+    return (f"SELECT a.* FROM assessments a JOIN (SELECT day, entity, MAX(revision) AS rev FROM assessments {where}"
+            " GROUP BY day, entity) m ON a.day=m.day AND a.entity=m.entity AND a.revision=m.rev", params)
 
 
-def as_of_view(r: dict, as_of: date) -> dict:
-    if r["outcome"] == "unscorable" or (r["outcome_day"] and r["outcome_day"] <= as_of.isoformat()):
-        return r
-    closed = as_of > date.fromisoformat(r["assessed_day"]) + timedelta(days=r["horizon_days"] + GRACE)
-    return r | {"outcome": "no_data" if closed else "pending", "outcome_value": None, "outcome_at": None,
-                "outcome_day": None, "change_pct": None}
-
-
-def _outcome_point(conn, tracked: dict, entity: str, day: date, horizon: int,
-                   ident: dict | None) -> metrics.Point | None:
-    """First observation in the outcome window measured exactly like the frozen baseline."""
+def _outcome_point(conn, tracked: dict, entity: str, day: date, horizon: int, ident: dict | None,
+                   cutoff: str | None) -> metrics.Point | None:
+    """First observation in the outcome window, measured like the frozen baseline, ingested by `cutoff`."""
     due = (day + timedelta(days=horizon)).isoformat()
     last = (day + timedelta(days=horizon + GRACE)).isoformat()
-    for p in metrics.tracked_points(conn, tracked, entity, ident=ident):
+    for p in metrics.tracked_points(conn, tracked, entity, ident=ident, available_by=cutoff):
         if due <= p.at[:10] <= last:
             return p
     return None
@@ -91,55 +66,99 @@ def decision_outcome(decision: str, change: float) -> str:
     return "missed" if change >= MISSED_RISE else "correct"
 
 
+def judge(conn: sqlite3.Connection, a: dict, system: str, horizon: int, today: date,
+          cutoff: str | None) -> dict:
+    """One assessment, one system, judged with what was ingested by `cutoff` (None = everything).
+
+    `outcome_at` is when the outcome was observed; `outcome_ingested_at` is when the store got it,
+    which is what decides whether a report on some day may see it as settled.
+    """
+    body = json.loads(a["body_json"])
+    snap = json.loads(a["snapshot_json"])
+    day = date.fromisoformat(a["day"])
+    tracked, base = snap.get("tracked"), snap.get("baseline")
+    row = {"system": system, "assessment_id": a["id"], "horizon_days": horizon, "series_json": db.dumps(tracked),
+           "baseline_value": base["value"] if base else None, "baseline_at": base["at"] if base else None,
+           "outcome_value": None, "outcome_at": None, "outcome_ingested_at": None, "change_pct": None}
+    if not tracked or not base:
+        return row | {"outcome": "unscorable", "detail": "no tracked series frozen at assessment time"}
+    if not base.get("ident"):
+        return row | {"outcome": "unscorable", "detail": "baseline has no measurement identity"}
+    if base["value"] == 0:
+        return row | {"outcome": "unscorable", "detail": "baseline is 0; change is undefined"}
+    p = _outcome_point(conn, tracked, a["entity"], day, horizon, base.get("ident"), cutoff)
+    if p is None:
+        expired = today > day + timedelta(days=horizon + GRACE)
+        return row | {"outcome": "no_data" if expired else "pending",
+                      "detail": "no observation in the outcome window" if expired else
+                      f"due {(day + timedelta(days=horizon)).isoformat()}"}
+    change = (p.value - base["value"]) / abs(base["value"])
+    row |= {"outcome_value": p.value, "outcome_at": p.at, "outcome_ingested_at": p.available_at, "change_pct": change}
+    if system == "lifecycle":
+        exp = body.get("expected_direction") or "holding"
+        return row | {"outcome": lifecycle_outcome(exp, change), "detail": f"{a['lifecycle']} expected {exp}"}
+    return row | {"outcome": decision_outcome(a["decision"], change), "detail": f"decision {a['decision']}"}
+
+
+def _systems(entity: str) -> list[tuple[str, int]]:
+    out = [("lifecycle", LIFECYCLE_HORIZON)]
+    if entity.startswith("opportunity:"):
+        out.append(("decision", DECISION_HORIZON))
+    return out
+
+
 def evaluate(conn: sqlite3.Connection, today: date) -> dict:
+    """Store the current result of every final revision, using everything ingested so far."""
     counts: dict[str, dict[str, int]] = {"lifecycle": {}, "decision": {}}
+    sql, params = _final(None)
     with db.tx(conn):
-        for a in _judged(conn):
-            body = json.loads(a["body_json"])
-            snap = json.loads(a["snapshot_json"])
-            day = date.fromisoformat(a["day"])
-            systems = [("lifecycle", LIFECYCLE_HORIZON)]
-            if a["entity"].startswith("opportunity:"):
-                systems.append(("decision", DECISION_HORIZON))
-            for system, horizon in systems:
-                tracked, base = snap.get("tracked"), snap.get("baseline")
-                row = {"system": system, "assessment_id": a["id"], "horizon_days": horizon,
-                       "series_json": db.dumps(tracked), "baseline_value": base["value"] if base else None,
-                       "baseline_at": base["at"] if base else None, "outcome_value": None, "outcome_at": None,
-                       "outcome_day": None,
-                       "change_pct": None, "evaluated_at": now_iso()}
-                if not tracked or not base:
-                    row |= {"outcome": "unscorable", "detail": "no tracked series frozen at assessment time"}
-                elif not base.get("ident"):
-                    row |= {"outcome": "unscorable", "detail": "baseline has no measurement identity"}
-                elif base["value"] == 0:
-                    row |= {"outcome": "unscorable", "detail": "baseline is 0; change is undefined"}
-                else:
-                    p = _outcome_point(conn, tracked, a["entity"], day, horizon, base.get("ident"))
-                    if p is None:
-                        expired = today > day + timedelta(days=horizon + GRACE)
-                        row |= {"outcome": "no_data" if expired else "pending",
-                                "detail": "no observation in the outcome window" if expired else
-                                f"due {(day + timedelta(days=horizon)).isoformat()}"}
-                    else:
-                        change = (p.value - base["value"]) / abs(base["value"])
-                        row |= {"outcome_value": p.value, "outcome_at": p.at, "outcome_day": p.day,
-                                "change_pct": change}
-                        if system == "lifecycle":
-                            exp = body.get("expected_direction") or "holding"
-                            row |= {"outcome": lifecycle_outcome(exp, change),
-                                    "detail": f"{a['lifecycle']} expected {exp}"}
-                        else:
-                            row |= {"outcome": decision_outcome(a["decision"], change),
-                                    "detail": f"decision {a['decision']}"}
+        for a in db.rows(conn, sql + " ORDER BY a.day, a.entity", params):
+            for system, horizon in _systems(a["entity"]):
+                row = judge(conn, a, system, horizon, today, None) | {"evaluated_at": now_iso()}
                 conn.execute("INSERT OR REPLACE INTO backtest_results (system, assessment_id, horizon_days,"
-                             " series_json, baseline_value, baseline_at, outcome_value, outcome_at, outcome_day, change_pct,"
-                             " outcome, detail, evaluated_at) VALUES (:system, :assessment_id, :horizon_days,"
-                             " :series_json, :baseline_value, :baseline_at, :outcome_value, :outcome_at, :outcome_day,"
-                             " :change_pct, :outcome, :detail, :evaluated_at)", row)
+                             " series_json, baseline_value, baseline_at, outcome_value, outcome_at,"
+                             " outcome_ingested_at, change_pct, outcome, detail, evaluated_at) VALUES (:system,"
+                             " :assessment_id, :horizon_days, :series_json, :baseline_value, :baseline_at,"
+                             " :outcome_value, :outcome_at, :outcome_ingested_at, :change_pct, :outcome, :detail,"
+                             " :evaluated_at)", row)
                 c = counts[system]
                 c[row["outcome"]] = c.get(row["outcome"], 0) + 1
     return counts
+
+
+def official(conn: sqlite3.Connection, system: str | None = None, entity: str | None = None,
+             as_of: date | None = None) -> list[dict]:
+    """Official backtest rows: final revisions only, joined with their assessment.
+
+    Without `as_of`: the stored results (current knowledge; superseded revisions' rows stay stored
+    for audit but are not returned). With `as_of`: recomputed as that day saw it, from revisions
+    created and observations ingested by the end of that day.
+    """
+    cutoff = end_of(as_of) if as_of else None
+    sql, params = _final(cutoff)
+    cols = "f.entity, f.day AS assessed_day, f.revision, f.lifecycle, f.decision"
+    clauses, args = [], list(params)
+    if as_of:
+        clauses.append("f.day <= ?")
+        args.append(as_of.isoformat())
+    if entity:
+        clauses.append("f.entity = ?")
+        args.append(entity)
+    where = (" WHERE " + " AND ".join(clauses)) if clauses else ""
+    if not as_of:
+        sys_clause = (" AND b.system = ?" if where else " WHERE b.system = ?") if system else ""
+        return db.rows(conn, f"SELECT b.*, {cols} FROM backtest_results b JOIN ({sql}) f ON f.id = b.assessment_id"
+                             f"{where}{sys_clause} ORDER BY f.day, b.system, f.entity",
+                       args + ([system] if system else []))
+    out = []
+    for a in db.rows(conn, f"SELECT f.*, {cols} FROM ({sql}) f{where} ORDER BY f.day, f.entity", args):
+        for sysname, horizon in _systems(a["entity"]):
+            if system and sysname != system:
+                continue
+            out.append(judge(conn, a, sysname, horizon, as_of, cutoff) |
+                       {k: a[k] for k in ("entity", "assessed_day", "revision", "lifecycle", "decision")})
+    out.sort(key=lambda r: (r["assessed_day"], r["system"], r["entity"]))
+    return out
 
 
 GOOD = {"lifecycle": {"hit"}, "decision": {"supported", "ok", "correct"}}
@@ -150,7 +169,7 @@ def summary(conn: sqlite3.Connection, as_of: date | None = None) -> dict:
     out = {}
     for system in ("lifecycle", "decision"):
         c: dict[str, int] = {}
-        for r in official(conn, "b.system=?", (system,), as_of):
+        for r in official(conn, system=system, as_of=as_of):
             c[r["outcome"]] = c.get(r["outcome"], 0) + 1
         good = sum(v for k, v in c.items() if k in GOOD[system])
         bad = sum(v for k, v in c.items() if k in BAD[system])
@@ -160,5 +179,9 @@ def summary(conn: sqlite3.Connection, as_of: date | None = None) -> dict:
 
 
 def resolved_on(conn: sqlite3.Connection, day: date) -> list[dict]:
-    """Official results whose outcome observation fell on `day` and was known by then (newly scored)."""
-    return official(conn, "substr(b.outcome_at,1,10)=?", (day.isoformat(),), as_of=day)
+    """Outcomes that became settled on `day`: ingested that day (observed then or earlier).
+
+    A metric observed on the 20th and ingested on the 22nd settles on the 22nd; its outcome_at stays the 20th.
+    """
+    return [r for r in official(conn, as_of=day)
+            if r["outcome_ingested_at"] and r["outcome_ingested_at"][:10] == day.isoformat()]

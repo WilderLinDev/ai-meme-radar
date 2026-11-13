@@ -11,10 +11,9 @@ import sqlite3
 from datetime import date
 
 from .. import backtest, db
-from ..config import Paths
+from ..config import Paths, end_of
 from ..decisions import all_effective, is_key, tracked_point
 from ..research.metrics import identity_key
-from ..gefei.sync import credits_spent
 from ..research.ingest import current_links
 from ..research.metrics import pct as pct_change
 from .common import (CONFIDENCE_ZH, cell, DECISION_ZH, FIELD_ZH, LIFECYCLE_ZH, OUTCOME_ZH, attrs, bullets, dimension_table, name_of,
@@ -111,8 +110,8 @@ def sync_note(conn: sqlite3.Connection, day: date) -> str:
     """Derived from the store, so rerunning a day renders the same text."""
     new = db.rows(conn, "SELECT service, COUNT(*) AS n FROM gefei_batches WHERE substr(first_seen_at,1,10)=?"
                         " GROUP BY service ORDER BY service", (day.isoformat(),))
-    if not new and not db.one(conn, "SELECT 1 FROM api_calls WHERE run_day=? AND purpose LIKE 'sync:%'",
-                              (day.isoformat(),)):
+    if not new and not db.one(conn, "SELECT 1 FROM api_calls WHERE run_day=? AND purpose LIKE 'sync:%'"
+                                    " AND started_at <= ?", (day.isoformat(), end_of(day))):
         return ""
     names = {"keywords": "新词", "launches": "新站", "hosted": "网站发现"}
     parts = "，".join(f"{names.get(r['service'], r['service'])} {r['n']} 批" for r in new) or "无新批次"
@@ -125,7 +124,7 @@ SIGNALS_ZH = {"found": "有", "none": "无", "unknown": "未知"}
 
 def coverage(conn: sqlite3.Connection, day: date) -> tuple[str, list[str]]:
     """(one-line summary, section lines) for the day's social research coverage."""
-    r = db.one(conn, "SELECT * FROM research_days WHERE day=?", (day.isoformat(),))
+    r = db.one(conn, "SELECT * FROM research_days WHERE day=? AND updated_at <= ?", (day.isoformat(), end_of(day)))
     if not r:
         return "社交调研覆盖：未记录（今日 research.json 未入库）。", ["今日没有入库的 research.json，社交调研覆盖情况未知。"]
     cov = json.loads(r["social_coverage_json"])
@@ -256,11 +255,13 @@ def render(conn: sqlite3.Connection, day: date, paths: Paths) -> tuple[str, list
     out.append("")
 
     # gaps & sources
-    gaps = db.rows(conn, "SELECT * FROM gaps WHERE day=? ORDER BY source", (day.isoformat(),))
+    gaps = db.rows(conn, "SELECT * FROM gaps WHERE day=? AND ingested_at <= ? ORDER BY source, note",
+                   (day.isoformat(), end_of(day)))
     out += ["## 数据缺口", ""] + ([f"- {g['source']}：{g['note']}" for g in gaps] or ["今天没有记录缺口。"]) + [""]
-    calls = db.one(conn, "SELECT COUNT(*) AS n FROM api_calls WHERE run_day=?", (day.isoformat(),))
+    calls = db.one(conn, "SELECT COUNT(*) AS n, COALESCE(SUM(credits_charged), 0) AS c FROM api_calls"
+                         " WHERE run_day=? AND started_at <= ?", (day.isoformat(), end_of(day)))
     out += ["## 数据与口径", "",
-            f"- 哥飞 API：今日 {calls['n'] if calls else 0} 次调用，实际扣除 {num(credits_spent(conn, day))} 积分【已核实·接口返回】。",
+            f"- 哥飞 API：今日 {calls['n'] if calls else 0} 次调用，实际扣除 {num(float(calls['c']) if calls else 0.0)} 积分【已核实·接口返回】。",
             "- 流量、点击为第三方估算，不等于实际营收；收入数据中的访问量是支付渠道引荐估算。",
             "- 数字标注：【已核实】【第三方读数】【估算】；缺失的序列不插值。", ""]
     records = [{"entity": s["entity"], **_state_record(conn, s, day)} for s in states]

@@ -13,13 +13,14 @@ from radar.gefei import normalize
 from radar.reports import daily, deep
 from radar.research import discover as disc
 from radar.research.ingest import InputError, current_links, ingest_research
-from conftest import DAY1, DEEP, assessment, coverage, research_doc, write
+from conftest import DAY1, advance, DEEP, assessment, coverage, research_doc, write
 
 D2, D8 = DAY1 + timedelta(days=1), DAY1 + timedelta(days=7)
 SINCE = "2000-01-01"
 
 
 def ingest(conn, paths, doc, day=DAY1):
+    advance(day)
     return ingest_research(conn, write(paths.work(day) / f"research-{len(list(paths.work(day).glob('*')))}.json",
                                        doc), day)
 

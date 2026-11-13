@@ -64,9 +64,28 @@ There is no overall score and no weighting. The decision explains how the dimens
 
 Every conclusion keeps its source, collection time, region, sample size, metric definition and confidence. Inferences and unvalidated assumptions go in `assumptions`, not in the rationale as facts. Numbers cited from Ge Fei carry the `api_call_id`; ingest checks that the value appears in the stored response unless it is tagged 估算.
 
-## Historical reports
+## Time: research day, observed at, ingested at
 
-A report for day D uses only what was known by D. Evidence and link events count by the research day they were ingested on, not by `collected_at`. Feedback counts by its ingestion day and date. A backtest outcome counts as settled only if its observation was ingested by D; otherwise it is pending, or no_data once the window has closed. Deep reports show evidence and links as of the assessment day, and backtests as of the report day. One known limit: entity names and descriptions are shown as currently stored.
+Every record keeps up to three times, and they are never mixed:
+
+| Time | Meaning | Fields |
+| --- | --- | --- |
+| research day | the day the record belongs to | `day` on evidence, assessments, link events, gaps, research_days |
+| observed at | when the original observation happened | evidence `collected_at`, backtest `outcome_at`, feedback `at` (user-supplied) |
+| ingested at | when it actually entered `radar.db` (wall clock, Asia/Shanghai) | evidence / feedback / gaps `ingested_at`, assessments `created_at`, link events `at`, research_days `updated_at`, backtest `outcome_ingested_at`, keyword snapshots `captured_at` |
+
+Only ingested-at proves the store knew something. A report for day D uses only records ingested by the end of D:
+- the latest assessment revision among those created by then (the cutoff is applied before picking the revision);
+- feedback ingested by then, applied over the assessment it was ingested after;
+- links replayed in insertion order from events recorded by then;
+- evidence, gaps and research metadata ingested by then;
+- backtests recomputed from the observations ingested by then. An outcome observed on the 20th and ingested on the 22nd settles on the 22nd, and keeps the 20th as its observation date.
+
+Deep reports show evidence and links as ingested when their assessment revision was created, and feedback and backtests as of the report day.
+
+Research for a day can only be written on that day: re-ingesting identical research or assessments for another day is a no-op, but anything new for a past or future research day is refused. This keeps "research day D" and "known on D" the same thing without bitemporal bookkeeping. Feedback has no research day and can be added any time; it counts from when it was ingested.
+
+Known limit: entity names and descriptions are not versioned, so an old report rebuilt later shows the current name.
 
 ## Lifecycle-specific depth
 
@@ -79,7 +98,7 @@ A report for day D uses only what was known by D. Evidence and link events count
 
 ## Backtests
 
-Both use the tracked series and the baseline frozen at assessment time. A value observed later, even one back-dated, never replaces the baseline. Only the final revision of each entity on each assessment day counts in official results. Results of superseded revisions stay stored for audit but never enter hit rates.
+Both use the tracked series and the baseline frozen at assessment time. A value observed later, even one back-dated, never replaces the baseline. Only the final revision of each entity on each assessment day counts in official results. Results of superseded revisions stay stored for audit but never enter hit rates. Historical views follow the time rules above.
 
 Observations are compared only when they measure the same thing: the same source, metric, unit, metric definition and region (for keyword heat, the same keyword). The baseline freezes this identity, and an outcome must match it. The daily report likewise compares a tracked value with the previous report only when the identity is unchanged; otherwise it says the definition changed and computes no growth.
 

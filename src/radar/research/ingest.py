@@ -19,7 +19,7 @@ from pathlib import Path
 from pydantic import ValidationError
 
 from .. import db
-from ..config import TZ, now_iso
+from ..config import TZ, end_of, now_iso, today
 from ..text import norm_key, parse_ref, ref
 from .models import EvidenceIn, ResearchFile
 
@@ -47,12 +47,16 @@ def entity_exists(conn: sqlite3.Connection, r: str) -> bool:
     return db.one(conn, "SELECT 1 FROM entities WHERE kind=? AND id=?", (kind, ident)) is not None
 
 
-def current_links(conn: sqlite3.Connection, as_of: date | None = None) -> dict[tuple[str, str, str], dict]:
-    """Effective links: replay the append-only link events (up to research day `as_of`, if given)."""
+def current_links(conn: sqlite3.Connection, as_of: date | str | None = None) -> dict[tuple[str, str, str], dict]:
+    """Effective links: replay the append-only link events in insertion order (id).
+
+    `as_of` (a report day, or an exact ingestion timestamp) keeps only events actually recorded by then
+    (`at`), whatever research `day` they were filed under.
+    """
     out: dict[tuple[str, str, str], dict] = {}
     sql, params = "SELECT * FROM link_events", ()
     if as_of:
-        sql, params = sql + " WHERE day <= ?", (as_of.isoformat(),)
+        sql, params = sql + " WHERE at <= ?", (end_of(as_of) if isinstance(as_of, date) else as_of,)
     for e in db.rows(conn, sql + " ORDER BY id", params):
         k = (e["src"], e["dst"], e["relation"])
         if e["action"] == "add":
@@ -170,7 +174,8 @@ def ingest_research(conn: sqlite3.Connection, path: Path, day: date) -> dict:
     if problems:
         raise InputError(problems)
 
-    stats = {"entities": 0, "links": 0, "evidence": 0, "gaps": 0}
+    stats = {"entities": 0, "links": 0, "evidence": 0, "gaps": 0, "metadata": 0}
+    at = now_iso()
     with db.tx(conn):
         for kind, n in nodes:
             data = n.model_dump(exclude={"id", "name"})
@@ -192,29 +197,44 @@ def ingest_research(conn: sqlite3.Connection, path: Path, day: date) -> dict:
                 stats["links"] += 1
         for e in rf.evidence:
             rec = evidence_record(e)
-            cols = ["day", *EVIDENCE_FIELDS, "fingerprint"]
+            cols = ["day", *EVIDENCE_FIELDS, "ingested_at", "fingerprint"]
             # fingerprint conflict = identical evidence already stored (idempotent); a ref clash with
             # different content was rejected above and would also violate the unique ref index
             cur = conn.execute(
                 f"INSERT INTO evidence ({', '.join(cols)}) VALUES ({', '.join('?' for _ in cols)})"
                 " ON CONFLICT(fingerprint) DO NOTHING",
-                (day.isoformat(), *(rec[k] for k in EVIDENCE_FIELDS), evidence_fingerprint(rec)))
+                (day.isoformat(), *(rec[k] for k in EVIDENCE_FIELDS), at, evidence_fingerprint(rec)))
             stats["evidence"] += cur.rowcount
         for g in rf.gaps:
-            cur = conn.execute("INSERT OR IGNORE INTO gaps (day, source, note, origin) VALUES (?,?,?,?)",
-                               (day.isoformat(), g.source, g.note, "agent"))
-            stats["gaps"] += cur.rowcount
+            stats["gaps"] += record_gap(conn, day, g.source, g.note, "agent")
         for c in rf.social_coverage:  # incomplete coverage is a gap too, so it is never silent
             if c.status != "covered":
-                conn.execute("INSERT OR IGNORE INTO gaps (day, source, note, origin) VALUES (?,?,?,?)",
-                             (day.isoformat(), f"社交调研：{c.platform}", f"{c.status}：{c.note}", "coverage"))
-        # the day's research metadata: one row per day, replaced when the file is re-ingested
-        conn.execute("INSERT OR REPLACE INTO research_days (day, notes, social_coverage_json, updated_at)"
-                     " VALUES (?,?,?,?)", (day.isoformat(), rf.notes,
-                                           db.dumps([c.model_dump() for c in rf.social_coverage]), now_iso()))
+                stats["gaps"] += record_gap(conn, day, f"社交调研：{c.platform}", f"{c.status}：{c.note}", "coverage")
+        # the day's research metadata: one row per day, replaced (and re-timestamped) only when it changes
+        coverage = db.dumps([c.model_dump() for c in rf.social_coverage])
+        meta = db.one(conn, "SELECT notes, social_coverage_json FROM research_days WHERE day=?", (day.isoformat(),))
+        if not meta or (meta["notes"], meta["social_coverage_json"]) != (rf.notes, coverage):
+            conn.execute("INSERT OR REPLACE INTO research_days (day, notes, social_coverage_json, updated_at)"
+                         " VALUES (?,?,?,?)", (day.isoformat(), rf.notes, coverage, at))
+            stats["metadata"] += 1
+        refuse_backdated(day, stats, path.name)  # raising here rolls the whole file back
     return stats
 
 
-def record_gap(conn: sqlite3.Connection, day: date, source: str, note: str, origin: str = "code") -> None:
-    conn.execute("INSERT OR IGNORE INTO gaps (day, source, note, origin) VALUES (?,?,?,?)",
-                 (day.isoformat(), source, note, origin))
+def refuse_backdated(day: date, stats: dict, what: str) -> None:
+    """Research for a day can only be written on that day (Asia/Shanghai).
+
+    Ingestion time is what proves the store knew something by a report's cutoff, so a record filed
+    under another research day would make that day's report wrong. Re-ingesting identical content
+    writes nothing and is allowed on any day; anything new for a past or future day is refused.
+    """
+    if day != today() and any(stats.values()):
+        raise InputError([f"{what}: would write {', '.join(f'{v} {k}' for k, v in stats.items() if v)} for "
+                          f"research day {day}, but today is {today()} (Asia/Shanghai). Backdated or future "
+                          f"research is not accepted: file it under today's research day."])
+
+
+def record_gap(conn: sqlite3.Connection, day: date, source: str, note: str, origin: str = "code") -> int:
+    """A gap belongs to research day `day`; ingested_at says when the store learned of it."""
+    return conn.execute("INSERT OR IGNORE INTO gaps (day, source, note, origin, ingested_at) VALUES (?,?,?,?,?)",
+                        (day.isoformat(), source, note, origin, now_iso())).rowcount

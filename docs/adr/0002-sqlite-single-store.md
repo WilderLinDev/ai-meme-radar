@@ -10,4 +10,4 @@ Reports are Markdown files next to the database; the database indexes them and m
 
 Rejected: CSV/JSON files in the repo (the previous design). They mixed code and data, made history edits easy and resumption hard. No legacy data was migrated.
 
-Schema versioning: `PRAGMA user_version` carries `SCHEMA_VERSION`. An empty file is initialized; the same version opens; any other version, or a non-empty file without a version, is refused with an error. Nothing is migrated, re-stamped or deleted automatically. A schema change bumps `SCHEMA_VERSION` and requires moving the old file aside.
+Schema versioning: `PRAGMA user_version` carries `SCHEMA_VERSION`. An empty file is initialized; the same version opens; any other version, or a non-empty file without a version, is refused with an error. Nothing is migrated, re-stamped or deleted automatically. A schema change bumps `SCHEMA_VERSION` and requires moving the old file aside. Version 3 (2026-11-13) adds ingestion timestamps; any v1/v2 store must be moved aside.

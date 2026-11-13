@@ -9,14 +9,16 @@ from radar import backtest, db, decisions
 from radar.gefei.client import Client
 from radar.research.discover import discover
 from radar.research.ingest import InputError, current_links, ingest_research
-from conftest import DAY1, DEEP, assessment, research_doc, write
+from conftest import DAY1, DEEP, advance, assessment, research_doc, write
 
 
 def ingest(conn, paths, doc, day=DAY1):
+    advance(day)
     return ingest_research(conn, write(paths.work(day) / "research.json", doc), day)
 
 
 def assess(conn, paths, items, day=DAY1):
+    advance(day)
     return decisions.ingest_assessments(conn, write(paths.work(day) / "assessments.json",
                                                     {"day": day.isoformat(), "assessments": items}), day)
 
@@ -24,8 +26,8 @@ def assess(conn, paths, items, day=DAY1):
 def test_research_ingest_is_idempotent(conn, paths):
     s1 = ingest(conn, paths, research_doc())
     s2 = ingest(conn, paths, research_doc())
-    assert s1 == {"entities": 3, "links": 3, "evidence": 2, "gaps": 1}
-    assert s2 == {"entities": 0, "links": 0, "evidence": 0, "gaps": 0}
+    assert s1 == {"entities": 3, "links": 3, "evidence": 2, "gaps": 1, "metadata": 1}
+    assert s2 == {"entities": 0, "links": 0, "evidence": 0, "gaps": 0, "metadata": 0}
     assert ("trend:ai-baby-dance", "keyword:ai baby dance", "searched_as") in current_links(conn)
 
 

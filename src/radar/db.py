@@ -8,6 +8,10 @@ Tables fall into four layers (see docs/adr/0002-sqlite-single-store.md):
 * Research layer: trends, formats, opportunities, link events, evidence, gaps.
 * Decision layer: immutable assessment revisions, human feedback, backtests,
   report states and the Lark document map.
+
+Time: `day` is the research day; `collected_at` / `outcome_at` / feedback `at` are observation times;
+`ingested_at` / `created_at` / link `at` / `captured_at` are real ingestion times, and only those decide
+what a historical report may see (docs/research-method.md, "Time").
 """
 from __future__ import annotations
 
@@ -17,7 +21,7 @@ import sqlite3
 from pathlib import Path
 from typing import Any, Iterable
 
-SCHEMA_VERSION = 2  # 2: unique evidence ref, feedback.ingested_day, backtest outcome_day, research_days
+SCHEMA_VERSION = 3  # 3: ingested_at on evidence, feedback, gaps; backtest outcome_ingested_at
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS api_catalog (
@@ -238,6 +242,7 @@ CREATE TABLE IF NOT EXISTS evidence (
   tag TEXT NOT NULL,
   api_call_id INTEGER,
   note TEXT NOT NULL DEFAULT '',
+  ingested_at TEXT NOT NULL,
   fingerprint TEXT NOT NULL UNIQUE
 );
 CREATE INDEX IF NOT EXISTS evidence_entity ON evidence(entity, metric, region, collected_at);
@@ -253,6 +258,7 @@ CREATE TABLE IF NOT EXISTS gaps (
   source TEXT NOT NULL,
   note TEXT NOT NULL,
   origin TEXT NOT NULL,
+  ingested_at TEXT NOT NULL,
   PRIMARY KEY (day, source, note)
 );
 
@@ -282,7 +288,7 @@ CREATE TABLE IF NOT EXISTS feedback (
   reason TEXT NOT NULL,
   author TEXT NOT NULL,
   source_file TEXT NOT NULL,
-  ingested_day TEXT NOT NULL,
+  ingested_at TEXT NOT NULL,
   fingerprint TEXT NOT NULL UNIQUE
 );
 CREATE TABLE IF NOT EXISTS backtest_results (
@@ -294,7 +300,7 @@ CREATE TABLE IF NOT EXISTS backtest_results (
   baseline_at TEXT,
   outcome_value REAL,
   outcome_at TEXT,
-  outcome_day TEXT,
+  outcome_ingested_at TEXT,
   change_pct REAL,
   outcome TEXT NOT NULL,
   detail TEXT NOT NULL,

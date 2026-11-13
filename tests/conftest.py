@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from datetime import date
+from datetime import date, datetime, time, timedelta
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
@@ -127,6 +127,41 @@ class FakeGefei:
                                "global_rank": 1000 * page, "category": "AI image", "traffic": [], "page_url": "p"}]}
         tool = path.rsplit("/", 1)[1]
         return self.query.get(tool)
+
+
+class Clock:
+    """A fake wall clock: starts at 18:00 on a day (after fixture collection times) and ticks 1s per reading."""
+
+    def __init__(self):
+        self.day(DAY1)
+
+    def day(self, d: date, hour: int = 18) -> None:
+        from radar.config import TZ
+        self.t = datetime.combine(d, time(hour), TZ)
+
+    def advance_to(self, d: date) -> None:
+        if self.t.date() < d:
+            self.day(d)
+
+    def __call__(self) -> datetime:
+        self.t += timedelta(seconds=1)
+        return self.t
+
+
+def advance(d: date) -> None:
+    """Simulate living on research day `d`: move the fake clock forward to it (never back)."""
+    from radar import config
+    config._clock.advance_to(d)
+
+
+@pytest.fixture(autouse=True)
+def clock():
+    """Every test runs on a controlled clock (DAY1 18:00 by default); move it with clock.day(D)."""
+    from radar import config
+    c = Clock()
+    config.set_clock(c)
+    yield c
+    config.set_clock(None)
 
 
 @pytest.fixture

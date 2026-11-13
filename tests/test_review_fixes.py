@@ -14,14 +14,16 @@ from radar.reports import daily, deep
 from radar.reports.daily import tracked_move
 from radar.research.discover import Matcher, group
 from radar.research.ingest import InputError, ingest_research
-from conftest import DAY1, DEEP, assessment, research_doc, write
+from conftest import DAY1, advance, DEEP, assessment, research_doc, write
 
 
 def ingest(conn, paths, doc, day=DAY1):
+    advance(day)
     return ingest_research(conn, write(paths.work(day) / "research.json", doc), day)
 
 
 def assess(conn, paths, items, day=DAY1):
+    advance(day)
     return decisions.ingest_assessments(conn, write(paths.work(day) / "assessments.json",
                                                     {"day": day.isoformat(), "assessments": items}), day)
 
@@ -57,7 +59,7 @@ def test_superseded_revisions_never_count(conn, paths):
                  " detail, evaluated_at, outcome_at) VALUES ('lifecycle', ?, 7, 'null', 'hit', 'old', 'x', ?)",
                  (rev1["id"], d8.isoformat()))
 
-    official = backtest.official(conn, "b.system='lifecycle' AND f.entity=?", (trend,))
+    official = backtest.official(conn, system="lifecycle", entity=trend)
     by_day = {r["assessed_day"]: r for r in official}
     assert set(by_day) == {DAY1.isoformat(), d2.isoformat(), d3.isoformat()}  # one row per day
     assert by_day[DAY1.isoformat()]["revision"] == 2
@@ -76,7 +78,7 @@ def test_no_observation_after_window_becomes_no_data(conn, paths):
     ingest(conn, paths, research_doc())
     assess(conn, paths, [assessment("trend:ai-baby-dance")])
     backtest.evaluate(conn, DAY1 + timedelta(days=30))
-    assert backtest.official(conn, "b.system='lifecycle'")[0]["outcome"] == "no_data"
+    assert backtest.official(conn, system="lifecycle")[0]["outcome"] == "no_data"
 
 
 # ---- 2. schema version ----

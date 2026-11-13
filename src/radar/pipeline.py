@@ -22,7 +22,7 @@ from pathlib import Path
 from typing import Callable
 
 from . import backtest, db, decisions, lark
-from .config import REPO, Paths, Settings, now_iso
+from .config import REPO, Paths, Settings, now_iso, today
 from .gefei.client import Client, GefeiError, Transport, urllib_transport
 from .gefei.sync import SERVICES, Syncer, credits_spent, pending_units
 from .reports import daily, deep
@@ -142,7 +142,7 @@ def decide(ctx: Context) -> str:
 
 
 def backtest_stage(ctx: Context) -> str:
-    return str(backtest.evaluate(ctx.conn, ctx.day))
+    return str(backtest.evaluate(ctx.conn, today()))  # stored results reflect everything known now
 
 
 def report(ctx: Context) -> str:

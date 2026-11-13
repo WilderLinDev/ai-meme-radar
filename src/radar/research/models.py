@@ -166,6 +166,8 @@ class CoverageIn(Strict):
     def _check(self):
         if self.platform not in COVERAGE_SOURCES:
             raise ValueError(f"social_coverage platform {self.platform!r} must be one of {COVERAGE_SOURCES}")
+        if self.status == "covered" and self.signals == "unknown":
+            raise ValueError(f"social_coverage {self.platform}: covered must report signals found or none")
         if self.status in ("covered", "partial") and not self.window.strip():
             raise ValueError(f"social_coverage {self.platform}: {self.status} needs the time window searched")
         if self.status != "covered" and not self.note.strip():
