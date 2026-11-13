@@ -2,6 +2,8 @@
 
 Every weekday at 08:30 Asia/Shanghai (cron `30 8 * * 1-5`, ±15 min). Delivery any time in the morning is fine: accuracy over speed. The report is in Chinese and answers one question: **which meme is worth an AI template today.** Words in bold below are defined in `GLOSSARY.md`.
 
+The scheduled Grok Bot job runs this Git checkout and its `radar` commands. Log the Git commit and start and finish times for CC lists, CC details, watchlist, heat and remixes, judgments, build, chat delivery, Git push, Wiki import and Base sync. Record interrupted stages and their last completed work so a retry can resume from the saved raw snapshots.
+
 Window: the last 24–48h (Monday covers the weekend). Platforms: TikTok first, then CapCut templates, then Instagram Reels. X, YouTube Shorts and Reddit are supporting sources. Never Douyin.
 
 ## 0. Prepare
@@ -19,6 +21,8 @@ Set `D=YYYY-MM-DD` (today, Asia/Shanghai). Everything collected today goes into 
 ## 1. Collect raw snapshots (agent, browser)
 
 Pull each bulk dataset **once**, at the start, into files. Do all matching from the files afterwards. Save every field the page shows, even ones the report does not use. Never invent rows.
+
+On retry, reuse completed raw snapshots. If a bulk source needs multiple passes, save each completed unit outside `data/raw/$D/` until the snapshot is ready to ingest. Resume unfinished units from that staging area. Record evidence that could not be collected in `gaps.json`.
 
 | File | What | How |
 | --- | --- | --- |
@@ -80,18 +84,26 @@ Checks the judgments (registered ids, override reasons, every Top 100 hashtag ac
 
 ## 6. Deliver
 
+Once `radar build` succeeds, reply in chat with the `make` picks, scores, days hot and peak status, the backtest line, the `skip` list, the report path, elapsed time and one or two chart images. If nothing new is trending, say so in one line and still commit.
+
 ```bash
 git add data/memes.csv data/raw/$D data/tracker.csv data/backtest.* reports/$D
 git commit -m "report: $D"
 git push
 ```
 
-Then reply in chat: the `make` picks with score, days hot and peak status; the backtest line; the `skip` list in one line; the report path; total run time; one or two chart images. If nothing new is trending, say so in one line and still commit.
+If the push fails, attach the built Word report in chat and note that the Git push is pending. Retry the same report when Git access is restored.
 
 ## 7. Lark (only when `lark.enabled`)
+
+Import `reports/$D/daily-report.docx` under `lark.wiki_parent_url`, store the doc URL under `[lark.digest_docs]` in local settings, and post the Wiki link in chat when ready. Run Base sync separately from chat delivery. The report index uses the stored Wiki URL.
+
+Get existing keys first with the connector's `search_records` on each table's `去重键`. A list skips those rows, while a map of key to `record_id` also writes update batches (backtest rows change from pending to a result).
 
 ```bash
 uv run radar export-lark $D --existing-keys data/lark-batches/$D/existing-keys.json
 ```
 
-Get existing keys first with the connector's `search_records` on each table's `去重键`: a list skips those rows, a map of key to record_id also writes update batches (backtest rows change from pending to a result). Then call `create_records` / `update_records` with each batch file inlined (40 records each). Import `reports/$D/daily-report.docx` under `lark.wiki_parent_url`, create nothing else, and store the doc URL under `[lark.digest_docs]` in local settings. If a write fails, say so in one line; the repo files are already delivered.
+Call `create_records` / `update_records` with batches from the current export. Report Wiki or Base failures separately in chat.
+
+Use the connector if the runtime lacks direct API authorization. For direct API writes, read each batch from file, reconcile existing records by `去重键` before retrying, and update changed records by `record_id`. Record batch sizes, elapsed time and API errors.
