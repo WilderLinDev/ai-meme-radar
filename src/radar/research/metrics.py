@@ -7,6 +7,7 @@ days stay missing: nothing is interpolated.
 from __future__ import annotations
 
 import sqlite3
+from datetime import date
 from dataclasses import asdict, dataclass
 
 from .. import db
@@ -20,6 +21,7 @@ class Point:
     at: str
     value: float
     ident: dict | None = None  # what was measured: source, metric, unit, definition, region
+    day: str = ""  # research day it became available (evidence.day / snapshot capture date)
 
 
 def identity_key(ident: dict | None) -> str:
@@ -75,13 +77,14 @@ def stats(label: str, points: list[Point]) -> SeriesStats | None:
 
 
 def evidence_series(conn: sqlite3.Connection, entity: str, metric: str, region: str = "", source: str = "",
-                    until: str | None = None, ident: dict | None = None) -> list[Point]:
+                    until: str | None = None, ident: dict | None = None,
+                    as_of_day: date | None = None) -> list[Point]:
     """One value per collection day (the last that day), ordered by time, from ONE measurement identity.
 
     The identity is (source, metric, unit, metric_definition, region). Without `ident`, the identity
     of the latest matching observation is used, so a series never mixes sources, units or definitions.
     """
-    sql = ("SELECT collected_at, value, source, unit, metric_definition FROM evidence WHERE entity=? AND metric=?"
+    sql = ("SELECT collected_at, value, source, unit, metric_definition, day FROM evidence WHERE entity=? AND metric=?"
            " AND region=? AND value IS NOT NULL")
     params: list = [entity, metric, region.upper()]
     if source:
@@ -90,6 +93,9 @@ def evidence_series(conn: sqlite3.Connection, entity: str, metric: str, region: 
     if until:
         sql += " AND collected_at <= ?"
         params.append(until)
+    if as_of_day:  # only what had been ingested by then, however it was back-dated
+        sql += " AND day <= ?"
+        params.append(as_of_day.isoformat())
     found = db.rows(conn, sql + " ORDER BY collected_at", params)
 
     def ident_of(r: dict) -> dict:
@@ -102,34 +108,38 @@ def evidence_series(conn: sqlite3.Connection, entity: str, metric: str, region: 
     for r in found:
         i = ident_of(r)
         if identity_key(i) == want:
-            by_day[r["collected_at"][:10]] = Point(r["collected_at"], float(r["value"]), i)
+            by_day[r["collected_at"][:10]] = Point(r["collected_at"], float(r["value"]), i, r["day"])
     return list(by_day.values())
 
 
-def keyword_heat_series(conn: sqlite3.Connection, keyword: str, until: str | None = None) -> list[Point]:
+def keyword_heat_series(conn: sqlite3.Connection, keyword: str, until: str | None = None,
+                        as_of_day: date | None = None) -> list[Point]:
     sql = "SELECT captured_at, heat_ratio FROM keyword_snapshots WHERE keyword=? AND heat_ratio IS NOT NULL"
     params: list = [keyword]
     if until:
         sql += " AND captured_at <= ?"
         params.append(until)
+    if as_of_day:
+        sql += " AND substr(captured_at, 1, 10) <= ?"
+        params.append(as_of_day.isoformat())
     ident = {"kind": "keyword_heat", "source": "Ge Fei", "metric": "heat_ratio", "keyword": keyword,
              "unit": "x GPTs baseline", "definition": "7-day heat relative to the GPTs benchmark keyword",
              "region": ""}
     by_day: dict[str, Point] = {}
     for r in db.rows(conn, sql + " ORDER BY captured_at", params):
-        by_day[r["captured_at"][:10]] = Point(r["captured_at"], float(r["heat_ratio"]), ident)
+        by_day[r["captured_at"][:10]] = Point(r["captured_at"], float(r["heat_ratio"]), ident, r["captured_at"][:10])
     return list(by_day.values())
 
 
 def tracked_points(conn: sqlite3.Connection, tracked: dict, entity: str, until: str | None = None,
-                   ident: dict | None = None) -> list[Point]:
+                   ident: dict | None = None, as_of_day: date | None = None) -> list[Point]:
     """The tracked series; pass the frozen `ident` to keep later observations comparable to the baseline."""
     if tracked["kind"] == "keyword_heat":
         from ..text import keyword_key
-        pts = keyword_heat_series(conn, keyword_key(tracked["keyword"]), until)
+        pts = keyword_heat_series(conn, keyword_key(tracked["keyword"]), until, as_of_day)
         return [p for p in pts if not ident or identity_key(p.ident) == identity_key(ident)]
     return evidence_series(conn, tracked.get("entity") or entity, tracked["metric"], tracked.get("region", ""),
-                           tracked.get("source", ""), until, ident)
+                           tracked.get("source", ""), until, ident, as_of_day)
 
 
 def entity_facts(conn: sqlite3.Connection, entity: str, links: dict) -> dict:

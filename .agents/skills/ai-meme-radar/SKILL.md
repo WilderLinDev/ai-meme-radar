@@ -70,7 +70,8 @@ The first run pulls every accessible batch of emerging keywords, new-site launch
 ### 2. Discover (Python writes `work/DAY/candidates.json`)
 
 Read it first. It holds:
-- `groups`: creative-relevant search / product / market candidates since the last run, merged when they share a keyword or domain, with `matches` to entities that already exist.
+- `groups`: creative-relevant search / product / market candidates since the last run, merged when they share a keyword or domain (transitively), with `matches` to entities that already exist. Each item and group carries `discovery`: `vocabulary` (matched a creative term) or `unmatched_exploration` (up to 10 fresh Ge Fei keywords that matched nothing; `exploration: true` on the group). Look at exploration groups quickly: most are noise, a few are memes the vocabulary doesn't know yet. They are built from data already synced and cost no API calls.
+- `stats`: total / included / truncated per source (search_vocabulary, search_exploration, launches, hosted, market). Large truncation means look at the source directly.
 - `link_suggestions`: trend or opportunity search terms that match stored keywords or site titles.
 - `refresh`: every live entity (not skipped) with the time of its last evidence. Refresh these.
 - `query_hints`: entities with search terms but no search evidence in 7 days, with suggested calls. They are not executed; you decide.
@@ -100,8 +101,10 @@ Schema: `src/radar/research/models.py` (`ResearchFile`). Ids are kebab-case and 
 - `formats`: the reusable pattern - what the user inputs, what they get.
 - `opportunities`: what we could ship; `product_type` video / image / audio / effect / multi / other.
 - `links`: trend -uses-> format, format -enables-> opportunity, trend -drives-> opportunity, trend -searched_as-> keyword, opportunity -targets-> keyword, any -competitor|related-> site, trend/format -related|variant_of-> same kind. Many-to-many is normal; never force one-to-one.
-- `evidence`: one row per observation, with `channel`, `source`, `url`, `metric`, `value`, `unit`, `region`, `sample_size`, `metric_definition`, `collected_at` (with offset), `confidence`, `tag` (已核实 / 第三方读数 / 估算), optional `api_call_id`, and a `ref` (globally unique) so assessments can cite it. Qualitative evidence leaves `value` empty and explains in `note`. Keep metric names stable across days for the same series (`posts_24h`, `views_top10_remix`, `cc_index`, `search_volume`, ...): backtests follow them.
+- `evidence`: one row per observation, with `channel`, `source`, `url`, `metric`, `value`, `unit`, `region`, `sample_size`, `metric_definition`, `collected_at` (with offset), `confidence`, `tag` (已核实 / 第三方读数 / 估算), optional `api_call_id`, and a `ref` so assessments can cite it. A ref is unique across the whole database, forever: re-ingesting the identical row is a no-op, but a ref that already names different evidence (any day, including today) is rejected. A new observation gets a new ref, e.g. `tt-aibabydance-posts-20261114`. Evidence is append-only; without a ref, changing any field stores a new row instead of replacing the old one. Qualitative evidence leaves `value` empty and explains in `note`. Keep metric names stable across days for the same series (`posts_24h`, `views_top10_remix`, `cc_index`, `search_volume`, ...): backtests follow them.
 - `gaps`: everything you tried and could not get, with why. Missing is not zero; never interpolate.
+- `social_coverage` (required): one entry per source: TikTok, CapCut, Instagram, X, YouTube, Reddit, Creative Center, Watchlist. Give `status` (covered / partial / failed / not_attempted), `window` (approximate time window searched; required unless failed or not attempted), `signals` (found / none / unknown) and `note` (what you did; for anything not covered, the reason: login wall, rate limit, out of time). Anything not covered becomes a gap automatically. The daily report shows this table and a one-line summary, so be honest: a source you didn't open is `not_attempted`, not `covered`.
+- `notes`: run-level remarks (method changes, what you would do with more time). Persisted and shown in the report.
 
 Rerun. Fix every problem it lists, then rerun again.
 
@@ -145,6 +148,7 @@ Only finished reports go to Lark: one document per daily report, one document pe
 ## Recovery
 
 Rerun `run` with the same DAY. Finished sync units are skipped and failed ones retried. Ingest is idempotent, and unchanged reports are neither rewritten nor republished. Use `status DAY` to see where it stopped.
+- Reports are reproducible: a report for day D only uses evidence and link events ingested by D, feedback ingested by D, and backtest outcomes ingested by D. Deep reports show evidence and links as of the assessment day. So rebuilding an old day never pulls in later data, and back-dating `collected_at` does not put evidence into an older report.
 - Exit 3: another run is in progress. Wait for it; never delete `run.lock`. A leftover file from a crashed run doesn't block anything, because the OS releases the lock when the process dies.
 - Rejected input file: fix that file. Never edit the database to get past a check.
 - `schema version N; this code needs M`: the database was made by an incompatible version. There are no migrations. Ask the user before moving `radar.db` aside; a fresh store is then created on the next run.

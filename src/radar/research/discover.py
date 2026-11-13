@@ -24,7 +24,21 @@ from ..text import Vocabulary, domain_of, keyword_key, norm_key, ref, term_match
 from .ingest import current_links
 
 KIND_ORDER = {"new": 0, "resurgence": 1, "spike": 2, "watch": 3, "old": 4}
-PER_CHANNEL = 150
+PER_SOURCE = 150  # vocabulary-matched candidates kept per source (search, launches, hosted, market)
+EXPLORE_LIMIT = 10  # unmatched search keywords kept for exploration
+EXPLORE_KINDS = ("new", "resurgence", "spike", "watch")  # fresh / emerging kinds only; never "old"
+VOCABULARY, EXPLORATION = "vocabulary", "unmatched_exploration"
+
+
+def _limit(items: list[dict], limit: int, name: str, stats: dict) -> list[dict]:
+    """Keep the first `limit` (items are pre-sorted deterministically) and record the counts."""
+    kept = items[:limit]
+    stats[name] = {"total": len(items), "included": len(kept), "truncated": len(items) - len(kept)}
+    return kept
+
+
+def _search_rank(c: dict) -> tuple:
+    return (KIND_ORDER.get(c["kind"] or "", 9), -(c["growth_pct"] or 0), -(c["heat_ratio"] or 0), c["keyword_key"])
 
 
 def _since(conn: sqlite3.Connection, day: date) -> str:
@@ -57,60 +71,77 @@ class Matcher:
         return sorted(hits)
 
 
-def search_candidates(conn, m: Matcher, since: str) -> list[dict]:
-    out = {}
+def search_candidates(conn, m: Matcher, since: str, stats: dict) -> list[dict]:
+    """Vocabulary-matched keywords (primary), plus a few unmatched fresh ones for exploration.
+
+    Uses only keyword snapshots already in SQLite: no API calls. Exploration picks the top
+    EXPLORE_LIMIT unmatched keywords of kind new / resurgence / spike / watch, ranked by kind, growth,
+    heat, then keyword (stable). Their channel stays `search`; `discovery` tells them apart.
+    """
+    latest: dict[str, dict] = {}
     for r in db.rows(conn, "SELECT s.*, k.display, k.category FROM keyword_snapshots s JOIN keywords k USING(keyword)"
                            " WHERE s.captured_at >= ? ORDER BY s.id", (since,)):
+        latest[r["keyword"]] = r  # last snapshot per keyword in the window
+    matched, unmatched = [], []
+    for key, r in sorted(latest.items()):
         data = json.loads(r["data_json"])
         hits = m.creative(r["display"], (data.get("brief") or {}).get("what"), category=r["category"])
-        if not hits:
-            continue
-        out[r["keyword"]] = {
-            "channel": "search", "keyword": r["display"], "kind": r["kind"], "heat_ratio": r["heat_ratio"],
-            "growth_pct": r["growth_pct"], "trend_now": r["trend_now"], "appear_date": r["appear_date"],
-            "burst_date": r["burst_date"], "gefei_verdict": r["verdict"],
-            "gefei_suggestion": r["verdict_suggestion"], "brief": data.get("brief"), "page_url": data.get("page_url"),
-            "batch_id": r["batch_id"], "call_id": r["call_id"], "matched_terms": hits}
-    rows = sorted(out.values(), key=lambda c: (KIND_ORDER.get(c["kind"] or "", 9), -(c["growth_pct"] or 0)))
-    return rows[:PER_CHANNEL]
+        c = {"channel": "search", "discovery": VOCABULARY if hits else EXPLORATION, "keyword": r["display"],
+             "keyword_key": key, "kind": r["kind"], "heat_ratio": r["heat_ratio"], "growth_pct": r["growth_pct"],
+             "trend_now": r["trend_now"], "appear_date": r["appear_date"], "burst_date": r["burst_date"],
+             "gefei_verdict": r["verdict"], "gefei_suggestion": r["verdict_suggestion"], "brief": data.get("brief"),
+             "page_url": data.get("page_url"), "batch_id": r["batch_id"], "call_id": r["call_id"],
+             "matched_terms": hits}
+        if hits:
+            matched.append(c)
+        elif r["kind"] in EXPLORE_KINDS:
+            unmatched.append(c)
+    return (_limit(sorted(matched, key=_search_rank), PER_SOURCE, "search_vocabulary", stats)
+            + _limit(sorted(unmatched, key=_search_rank), EXPLORE_LIMIT, "search_exploration", stats))
 
 
-def product_candidates(conn, m: Matcher, since: str) -> list[dict]:
+def launch_candidates(conn, m: Matcher, since: str, stats: dict) -> list[dict]:
     out = []
-    for r in db.rows(conn, "SELECT * FROM launches WHERE captured_at >= ? ORDER BY posted_at DESC", (since,)):
+    for r in db.rows(conn, "SELECT * FROM launches WHERE captured_at >= ? ORDER BY posted_at DESC, id", (since,)):
         hits = m.creative(r["title"], r["purpose"], r["keyword"], r["domain"], category=r["category"])
         if hits:
-            out.append({"channel": "product", "source": f"launch:{r['source']}", "domain": r["domain"],
-                        "title": r["title"], "url": r["url"], "purpose": r["purpose"], "category": r["category"],
-                        "keyword": r["keyword"], "monetization": r["monetization"], "audience": r["audience"],
-                        "motive_type": r["motive_type"], "monthly_traffic": r["monthly_traffic"],
-                        "domain_registered": r["domain_registered"], "posted_at": r["posted_at"],
-                        "call_id": r["call_id"], "matched_terms": hits})
+            out.append({"channel": "product", "discovery": VOCABULARY, "source": f"launch:{r['source']}",
+                        "domain": r["domain"], "title": r["title"], "url": r["url"], "purpose": r["purpose"],
+                        "category": r["category"], "keyword": r["keyword"], "monetization": r["monetization"],
+                        "audience": r["audience"], "motive_type": r["motive_type"],
+                        "monthly_traffic": r["monthly_traffic"], "domain_registered": r["domain_registered"],
+                        "posted_at": r["posted_at"], "call_id": r["call_id"], "matched_terms": hits})
+    return _limit(out, PER_SOURCE, "launches", stats)
+
+
+def hosted_candidates(conn, m: Matcher, since: str, stats: dict) -> list[dict]:
+    out = []
     for r in db.rows(conn, "SELECT * FROM hosted_site_snapshots WHERE captured_at >= ? AND period='default'"
-                           " ORDER BY latest28_clicks DESC", (since,)):
+                           " ORDER BY latest28_clicks IS NULL, latest28_clicks DESC, site, id", (since,)):
         hits = m.creative(r["title"], r["description"], r["site"])
         if hits:
             data = json.loads(r["data_json"])
-            out.append({"channel": "product", "source": f"hosted:{r['platform']}", "domain": domain_of(r["site"]),
-                        "title": r["title"], "description": r["description"],
+            out.append({"channel": "product", "discovery": VOCABULARY, "source": f"hosted:{r['platform']}",
+                        "domain": domain_of(r["site"]), "title": r["title"], "description": r["description"],
                         "latest28_clicks": r["latest28_clicks"], "peak_clicks": r["peak_clicks"],
                         "top_keywords": data.get("top_keywords"), "first_period": data.get("first_period"),
                         "call_id": r["call_id"], "matched_terms": hits})
-    return out[:PER_CHANNEL]
+    return _limit(out, PER_SOURCE, "hosted", stats)
 
 
-def market_candidates(conn, m: Matcher, since: str) -> list[dict]:
+def market_candidates(conn, m: Matcher, since: str, stats: dict) -> list[dict]:
     out = []
     for r in db.rows(conn, "SELECT r.* FROM revenue_site_snapshots r JOIN sites s ON s.domain = r.domain"
-                           " WHERE r.captured_at >= ? ORDER BY r.global_rank IS NULL, r.global_rank", (since,)):
+                           " WHERE r.captured_at >= ? ORDER BY r.global_rank IS NULL, r.global_rank, r.domain, r.id",
+                     (since,)):
         hits = m.creative(r["domain"], category=r["category"])
         if hits:
             data = json.loads(r["data_json"])
-            out.append({"channel": "market", "domain": r["domain"], "month": r["month"], "period": r["period"],
-                        "global_rank": r["global_rank"], "category": r["category"],
+            out.append({"channel": "market", "discovery": VOCABULARY, "domain": r["domain"], "month": r["month"],
+                        "period": r["period"], "global_rank": r["global_rank"], "category": r["category"],
                         "traffic": data.get("traffic"), "channels": data.get("channels"),
                         "note": "估算访问量，不是营收", "call_id": r["call_id"], "matched_terms": hits})
-    return out[:PER_CHANNEL]
+    return _limit(out, PER_SOURCE, "market", stats)
 
 
 def _keys_of(c: dict) -> list[str]:
@@ -150,15 +181,22 @@ def group(cands: list[dict], m: Matcher) -> list[dict]:
         first = items[0]
         keys: list[str] = []
         channels: list[str] = []
+        discovery: list[str] = []
         for c in items:
             keys += [k for k in _keys_of(c) if k not in keys]
             if c["channel"] not in channels:
                 channels.append(c["channel"])
+            d = c.get("discovery", VOCABULARY)
+            if d not in discovery:
+                discovery.append(d)
         texts = [t for c in items for t in (c.get("keyword"), c.get("title")) if t]
         groups.append({"label": first.get("keyword") or first.get("title") or first.get("domain") or "?",
-                       "keys": keys, "channels": channels, "items": items,
+                       "keys": keys, "channels": channels, "discovery": sorted(discovery),
+                       "exploration": EXPLORATION in discovery, "items": items,
                        "matches": sorted({r for t in texts for r in m.entities_for(t)})})
-    groups.sort(key=lambda g: (-len(g["channels"]), not g["matches"], g["label"], g["keys"]))
+    # exploration-only groups go last so they never crowd out matched ones
+    groups.sort(key=lambda g: (g["discovery"] == [EXPLORATION], -len(g["channels"]), not g["matches"], g["label"],
+                               g["keys"]))
     return groups
 
 
@@ -226,12 +264,16 @@ def query_hints(conn, day: date) -> list[dict]:
 def discover(conn: sqlite3.Connection, day: date, out: Path) -> dict:
     since = _since(conn, day)
     m = Matcher(conn)
-    cands = search_candidates(conn, m, since) + product_candidates(conn, m, since) + market_candidates(conn, m, since)
+    stats: dict[str, dict] = {}
+    cands = (search_candidates(conn, m, since, stats) + launch_candidates(conn, m, since, stats)
+             + hosted_candidates(conn, m, since, stats) + market_candidates(conn, m, since, stats))
     groups = group(cands, m)
     doc = {
         "day": day.isoformat(), "since": since,
         "note": "Code-found candidates (search/product/market). Social discovery is the agent's job; merge both "
-                "into research.json. Nothing here is a judgment.",
+                "into research.json. Nothing here is a judgment. discovery=unmatched_exploration marks fresh Ge Fei "
+                "keywords that matched no creative term: check them, most will be irrelevant.",
+        "stats": stats,
         "groups": groups,
         "link_suggestions": link_suggestions(conn, m),
         "refresh": refresh_list(conn, day),
@@ -240,7 +282,6 @@ def discover(conn: sqlite3.Connection, day: date, out: Path) -> dict:
     }
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps(doc, ensure_ascii=False, indent=2, default=str) + "\n", encoding="utf-8")
-    return {"groups": len(groups), "search": sum(1 for c in cands if c["channel"] == "search"),
-            "product": sum(1 for c in cands if c["channel"] == "product"),
-            "market": sum(1 for c in cands if c["channel"] == "market"),
+    return {"groups": len(groups), "exploration_groups": sum(1 for g in groups if g["exploration"]),
+            **{k: v["included"] for k, v in stats.items()},
             "link_suggestions": len(doc["link_suggestions"]), "refresh": len(doc["refresh"])}

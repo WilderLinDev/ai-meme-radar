@@ -56,9 +56,9 @@ def effective(conn: sqlite3.Connection, entity: str, as_of: date | None = None) 
              "confidence": a["confidence"], "body": a["body"], "overrides": [], "directions": []}
     sql = "SELECT * FROM feedback WHERE entity=? AND at > ?"
     params: list = [entity, a["created_at"]]
-    if as_of:
-        sql += " AND at <= ?"
-        params.append(_end_of(as_of))
+    if as_of:  # known by then: ingested on or before as_of, and dated on or before it
+        sql += " AND ingested_day <= ? AND at <= ?"
+        params += [as_of.isoformat(), _end_of(as_of)]
     for f in db.rows(conn, sql + " ORDER BY at, id", params):
         if f["field"] in ("decision", "priority", "lifecycle"):
             state["overrides"].append({"field": f["field"], "from": state[f["field"]], "to": f["new_value"],
@@ -229,9 +229,10 @@ def ingest_feedback(conn: sqlite3.Connection, inbox: Path, day: date) -> dict:
                     continue
                 old = st[f.field]
             with db.tx(conn):
-                db.insert(conn, "feedback", {"at": f.at.isoformat(), "entity": ent, "field": f.field,
+                db.insert(conn, "feedback", {"at": f.at.astimezone(TZ).isoformat(), "entity": ent, "field": f.field,
                                              "old_value": old, "new_value": f.value, "reason": f.reason,
-                                             "author": f.author, "source_file": path.name, "fingerprint": fp})
+                                             "author": f.author, "source_file": path.name,
+                                             "ingested_day": day.isoformat(), "fingerprint": fp})
                 if target:
                     add_link_event(conn, ent, target, relation,
                                    "add" if f.field == "link_add" else "remove", f"human:{f.author}", f.reason, day)
@@ -246,7 +247,7 @@ def tracked_point(conn: sqlite3.Connection, state: dict, as_of: date) -> metrics
     tr = state["body"].get("tracked")
     if not tr:
         return None
-    pts = metrics.tracked_points(conn, tr, state["entity"], until=_end_of(as_of))
+    pts = metrics.tracked_points(conn, tr, state["entity"], until=_end_of(as_of), as_of_day=as_of)
     return pts[-1] if pts else None
 
 

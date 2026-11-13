@@ -17,7 +17,7 @@ import sqlite3
 from pathlib import Path
 from typing import Any, Iterable
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2  # 2: unique evidence ref, feedback.ingested_day, backtest outcome_day, research_days
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS api_catalog (
@@ -241,6 +241,13 @@ CREATE TABLE IF NOT EXISTS evidence (
   fingerprint TEXT NOT NULL UNIQUE
 );
 CREATE INDEX IF NOT EXISTS evidence_entity ON evidence(entity, metric, region, collected_at);
+CREATE UNIQUE INDEX IF NOT EXISTS evidence_ref ON evidence(ref) WHERE ref IS NOT NULL;
+CREATE TABLE IF NOT EXISTS research_days (
+  day TEXT PRIMARY KEY,
+  notes TEXT NOT NULL,
+  social_coverage_json TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
 CREATE TABLE IF NOT EXISTS gaps (
   day TEXT NOT NULL,
   source TEXT NOT NULL,
@@ -275,6 +282,7 @@ CREATE TABLE IF NOT EXISTS feedback (
   reason TEXT NOT NULL,
   author TEXT NOT NULL,
   source_file TEXT NOT NULL,
+  ingested_day TEXT NOT NULL,
   fingerprint TEXT NOT NULL UNIQUE
 );
 CREATE TABLE IF NOT EXISTS backtest_results (
@@ -286,6 +294,7 @@ CREATE TABLE IF NOT EXISTS backtest_results (
   baseline_at TEXT,
   outcome_value REAL,
   outcome_at TEXT,
+  outcome_day TEXT,
   change_pct REAL,
   outcome TEXT NOT NULL,
   detail TEXT NOT NULL,

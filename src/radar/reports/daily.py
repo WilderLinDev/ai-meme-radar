@@ -17,7 +17,7 @@ from ..research.metrics import identity_key
 from ..gefei.sync import credits_spent
 from ..research.ingest import current_links
 from ..research.metrics import pct as pct_change
-from .common import (CONFIDENCE_ZH, DECISION_ZH, FIELD_ZH, LIFECYCLE_ZH, OUTCOME_ZH, attrs, bullets, dimension_table, name_of,
+from .common import (CONFIDENCE_ZH, cell, DECISION_ZH, FIELD_ZH, LIFECYCLE_ZH, OUTCOME_ZH, attrs, bullets, dimension_table, name_of,
                      num, pct, write_report)
 
 BIG_MOVE = 0.30
@@ -26,7 +26,7 @@ DECISION_ORDER = {"build": 0, "validate": 1, "monitor": 2, "skip": 3}
 
 
 def _state_record(conn, st: dict, day: date) -> dict:
-    p = tracked_point(conn, st, day)
+    p = tracked_point(conn, st, day)  # only observations ingested by `day`
     return {k: st[k] for k in ("lifecycle", "decision", "priority", "confidence", "assessed_day", "revision")} | {
         "tracked": {"value": p.value, "at": p.at, "ident": p.ident} if p else None,
         "overrides": len(st["overrides"])}
@@ -111,18 +111,39 @@ def sync_note(conn: sqlite3.Connection, day: date) -> str:
     """Derived from the store, so rerunning a day renders the same text."""
     new = db.rows(conn, "SELECT service, COUNT(*) AS n FROM gefei_batches WHERE substr(first_seen_at,1,10)=?"
                         " GROUP BY service ORDER BY service", (day.isoformat(),))
-    retry = db.one(conn, "SELECT COUNT(*) AS n FROM sync_items WHERE status IN ('pending','failed')")
     if not new and not db.one(conn, "SELECT 1 FROM api_calls WHERE run_day=? AND purpose LIKE 'sync:%'",
                               (day.isoformat(),)):
         return ""
     names = {"keywords": "新词", "launches": "新站", "hosted": "网站发现"}
     parts = "，".join(f"{names.get(r['service'], r['service'])} {r['n']} 批" for r in new) or "无新批次"
-    return f"哥飞数据同步：今日首次入库 {parts}；待重试单元 {retry['n'] if retry else 0} 个。"
+    return f"哥飞数据同步：今日首次入库 {parts}。"
+
+
+COVERAGE_ZH = {"covered": "已完成", "partial": "部分完成", "failed": "失败", "not_attempted": "未进行"}
+SIGNALS_ZH = {"found": "有", "none": "无", "unknown": "未知"}
+
+
+def coverage(conn: sqlite3.Connection, day: date) -> tuple[str, list[str]]:
+    """(one-line summary, section lines) for the day's social research coverage."""
+    r = db.one(conn, "SELECT * FROM research_days WHERE day=?", (day.isoformat(),))
+    if not r:
+        return "社交调研覆盖：未记录（今日 research.json 未入库）。", ["今日没有入库的 research.json，社交调研覆盖情况未知。"]
+    cov = json.loads(r["social_coverage_json"])
+    done = [c for c in cov if c["status"] == "covered"]
+    other = [c for c in cov if c["status"] != "covered"]
+    summary = f"社交调研覆盖：{len(done)}/{len(cov)} 个来源完成" + (
+        "；未完成：" + "、".join(f"{c['platform']}（{COVERAGE_ZH[c['status']]}）" for c in other) if other else "") + "。"
+    lines = ["| 来源 | 状态 | 时间窗 | 有用信号 | 说明 |", "| --- | --- | --- | --- | --- |"]
+    lines += [f"| {c['platform']} | {COVERAGE_ZH[c['status']]} | {cell(c['window']) or '—'} | "
+              f"{SIGNALS_ZH[c['signals']]} | {cell(c['note']) or '—'} |" for c in cov]
+    if r["notes"].strip():
+        lines += ["", f"调研备注：{r['notes'].strip()}"]
+    return summary, lines
 
 
 def render(conn: sqlite3.Connection, day: date, paths: Paths) -> tuple[str, list[dict]]:
     states = all_effective(conn, day)
-    links = current_links(conn)
+    links = current_links(conn, as_of=day)  # every query below is bounded by the report day
     prev_day, prev = previous_states(conn, day)
     covered: set[str] = set()
 
@@ -137,6 +158,8 @@ def render(conn: sqlite3.Connection, day: date, paths: Paths) -> tuple[str, list
     note = sync_note(conn, day)
     if note:
         out += [f"> {note}", ""]
+    cov_summary, cov_lines = coverage(conn, day)
+    out += [f"> {cov_summary}", ""]
 
     # 1. key opportunities
     key = _sort([s for s in states if is_key(s)])
@@ -216,8 +239,10 @@ def render(conn: sqlite3.Connection, day: date, paths: Paths) -> tuple[str, list
         out += ["", "不做：" + "、".join(name_of(conn, s["entity"]) for s in _sort(skipped))]
     out.append("")
 
+    out += ["## 社交调研覆盖", ""] + cov_lines + [""]
+
     # backtest
-    sm = backtest.summary(conn)
+    sm = backtest.summary(conn, as_of=day)
     out += ["## 回测", ""]
     for system, label in (("lifecycle", "生命周期预测"), ("decision", "模板机会决策")):
         s = sm[system]

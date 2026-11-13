@@ -11,6 +11,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from ..config import COVERAGE_SOURCES
 from ..text import ASSESSABLE, SLUG, parse_ref
 
 Channel = Literal["social", "search", "product", "market"]
@@ -119,7 +120,7 @@ class LinkIn(Strict):
 
 
 class EvidenceIn(Strict):
-    ref: str = ""  # day-scoped handle so assessments can cite it
+    ref: str = ""  # optional handle assessments cite; globally unique and permanent across all days
     entity: str
     channel: Channel
     source: str  # TikTok, CapCut, Creative Center, Google Trends (Ge Fei), ...
@@ -153,6 +154,25 @@ class EvidenceIn(Strict):
         return self
 
 
+class CoverageIn(Strict):
+    """Did today's social sweep actually cover this source? One entry per COVERAGE_SOURCES item."""
+    platform: str
+    status: Literal["covered", "partial", "failed", "not_attempted"]
+    window: str = ""  # approximate time window searched, e.g. "last 48h (11-11 09:00 – 11-13 09:00)"
+    signals: Literal["found", "none", "unknown"] = "unknown"  # were useful signals found?
+    note: str = ""  # what was done; for partial / failed / not_attempted: why (login wall, rate limit, ...)
+
+    @model_validator(mode="after")
+    def _check(self):
+        if self.platform not in COVERAGE_SOURCES:
+            raise ValueError(f"social_coverage platform {self.platform!r} must be one of {COVERAGE_SOURCES}")
+        if self.status in ("covered", "partial") and not self.window.strip():
+            raise ValueError(f"social_coverage {self.platform}: {self.status} needs the time window searched")
+        if self.status != "covered" and not self.note.strip():
+            raise ValueError(f"social_coverage {self.platform}: {self.status} needs a reason in note")
+        return self
+
+
 class GapIn(Strict):
     source: str
     note: str
@@ -166,11 +186,17 @@ class ResearchFile(Strict):
     links: list[LinkIn] = []
     evidence: list[EvidenceIn] = []
     gaps: list[GapIn] = []
-    notes: str = ""
+    social_coverage: list[CoverageIn] = []  # required: every COVERAGE_SOURCES platform, once
+    notes: str = ""  # run-level remarks; persisted and shown in the daily report
 
     @model_validator(mode="after")
     def _unique(self):
         problems = []
+        seen = [c.platform for c in self.social_coverage]
+        missing = [p for p in COVERAGE_SOURCES if p not in seen]
+        if missing:
+            problems.append(f"social_coverage must report every source; missing {missing}")
+        problems += [f"social_coverage lists {p} twice" for p in sorted({p for p in seen if seen.count(p) > 1})]
         for kind, items in (("trend", self.trends), ("format", self.formats), ("opportunity", self.opportunities)):
             ids = [i.id for i in items]
             problems += [f"duplicate {kind} id {i}" for i in sorted({i for i in ids if ids.count(i) > 1})]

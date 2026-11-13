@@ -40,6 +40,8 @@ GLOBAL_MARKET = "WORLD"  # early signals
 MARKETS = (PRIMARY_MARKET, *SUPPLEMENTARY_MARKETS, *OBSERVED_MARKETS, GLOBAL_MARKET)
 CC_REGIONS = ("US", "GB", "AU", "CA", "DE", "JP", "KR", "FR")  # Creative Center: NL is not offered
 SOCIAL_PLATFORMS = ("TikTok", "CapCut", "Instagram", "X", "YouTube", "Reddit")  # never Douyin
+# Every social source the agent must report on each day in research.json `social_coverage`.
+COVERAGE_SOURCES = (*SOCIAL_PLATFORMS, "Creative Center", "Watchlist")
 
 GEFEI_BASE_URL = "https://seo.web.cafe"
 

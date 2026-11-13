@@ -64,6 +64,10 @@ There is no overall score and no weighting. The decision explains how the dimens
 
 Every conclusion keeps its source, collection time, region, sample size, metric definition and confidence. Inferences and unvalidated assumptions go in `assumptions`, not in the rationale as facts. Numbers cited from Ge Fei carry the `api_call_id`; ingest checks that the value appears in the stored response unless it is tagged 估算.
 
+## Historical reports
+
+A report for day D uses only what was known by D. Evidence and link events count by the research day they were ingested on, not by `collected_at`. Feedback counts by its ingestion day and date. A backtest outcome counts as settled only if its observation was ingested by D; otherwise it is pending, or no_data once the window has closed. Deep reports show evidence and links as of the assessment day, and backtests as of the report day. One known limit: entity names and descriptions are shown as currently stored.
+
 ## Lifecycle-specific depth
 
 | Lifecycle | In-depth report focuses on |

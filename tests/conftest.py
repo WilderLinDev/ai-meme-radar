@@ -157,6 +157,17 @@ def settings() -> Settings:
     return s
 
 
+def coverage(**status) -> list[dict]:
+    """Full social coverage; pass platform=("failed", "reason") to change one."""
+    from radar.config import COVERAGE_SOURCES
+    out = []
+    for p in COVERAGE_SOURCES:
+        st, note = status.get(p.replace(" ", "_"), ("covered", ""))
+        out.append({"platform": p, "status": st, "window": "" if st in ("failed", "not_attempted") else "last 48h",
+                    "signals": "found" if st == "covered" else "unknown", "note": note})
+    return out
+
+
 def research_doc(day: date = DAY1, **over) -> dict:
     doc = {
         "day": day.isoformat(),
@@ -181,6 +192,8 @@ def research_doc(day: date = DAY1, **over) -> dict:
              "confidence": "medium", "tag": "第三方读数"},
         ],
         "gaps": [{"source": "Instagram", "note": "login wall"}],
+        "social_coverage": coverage(),
+        "notes": "sweep done",
     }
     doc.update(over)
     return doc

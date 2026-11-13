@@ -19,9 +19,9 @@ from pathlib import Path
 from pydantic import ValidationError
 
 from .. import db
-from ..config import now_iso
+from ..config import TZ, now_iso
 from ..text import norm_key, parse_ref, ref
-from .models import ResearchFile
+from .models import EvidenceIn, ResearchFile
 
 
 class InputError(Exception):
@@ -47,10 +47,13 @@ def entity_exists(conn: sqlite3.Connection, r: str) -> bool:
     return db.one(conn, "SELECT 1 FROM entities WHERE kind=? AND id=?", (kind, ident)) is not None
 
 
-def current_links(conn: sqlite3.Connection) -> dict[tuple[str, str, str], dict]:
-    """Latest event per (src, dst, relation) that is an add."""
+def current_links(conn: sqlite3.Connection, as_of: date | None = None) -> dict[tuple[str, str, str], dict]:
+    """Effective links: replay the append-only link events (up to research day `as_of`, if given)."""
     out: dict[tuple[str, str, str], dict] = {}
-    for e in db.rows(conn, "SELECT * FROM link_events ORDER BY id"):
+    sql, params = "SELECT * FROM link_events", ()
+    if as_of:
+        sql, params = sql + " WHERE day <= ?", (as_of.isoformat(),)
+    for e in db.rows(conn, sql + " ORDER BY id", params):
         k = (e["src"], e["dst"], e["relation"])
         if e["action"] == "add":
             out[k] = e
@@ -101,6 +104,24 @@ def _keys(kind: str, ident: str, name: str, aliases: list[str]) -> set[str]:
     return {f"{kind}|{norm_key(x)}" for x in (ident.replace("-", " "), name, *aliases) if norm_key(x)}
 
 
+# Every persisted field that carries meaning. Excluded: id (generated) and day (when it was ingested).
+EVIDENCE_FIELDS = ("ref", "entity", "channel", "source", "url", "metric", "value", "unit", "region", "sample_size",
+                   "metric_definition", "collected_at", "confidence", "tag", "api_call_id", "note")
+
+
+def evidence_record(e: EvidenceIn) -> dict:
+    """Canonical stored form: normalized ref, entity and region, float value, Asia/Shanghai timestamp."""
+    return {"ref": e.ref or None, "entity": ref(*parse_ref(e.entity)), "channel": e.channel, "source": e.source,
+            "url": e.url, "metric": e.metric, "value": float(e.value) if e.value is not None else None,
+            "unit": e.unit, "region": e.region.upper(), "sample_size": e.sample_size,
+            "metric_definition": e.metric_definition, "collected_at": e.collected_at.astimezone(TZ).isoformat(),
+            "confidence": e.confidence, "tag": e.tag, "api_call_id": e.api_call_id, "note": e.note}
+
+
+def evidence_fingerprint(rec: dict) -> str:
+    return db.sha({k: rec[k] for k in EVIDENCE_FIELDS})
+
+
 def ingest_research(conn: sqlite3.Connection, path: Path, day: date) -> dict:
     rf: ResearchFile = load_model(path, ResearchFile)
     problems: list[str] = []
@@ -141,8 +162,11 @@ def ingest_research(conn: sqlite3.Connection, path: Path, day: date) -> dict:
             elif found is False and e.tag != "估算":
                 problems.append(f"evidence {e.ref or e.source}: value {e.value} does not appear in call "
                                 f"{e.api_call_id}; tag it 估算 if derived, or fix it")
-        if e.ref and db.one(conn, "SELECT 1 FROM evidence WHERE ref=? AND day!=?", (e.ref, day.isoformat())):
-            problems.append(f"evidence ref {e.ref} was already used on another day; refs are global")
+        if e.ref:
+            held = db.one(conn, "SELECT day, fingerprint FROM evidence WHERE ref=?", (e.ref,))
+            if held and held["fingerprint"] != evidence_fingerprint(evidence_record(e)):
+                problems.append(f"evidence ref {e.ref} already names different evidence (ingested {held['day']}); "
+                                f"refs are global and permanent: use a new ref")
     if problems:
         raise InputError(problems)
 
@@ -167,24 +191,27 @@ def ingest_research(conn: sqlite3.Connection, path: Path, day: date) -> dict:
             if add_link_event(conn, s, d, l.relation, "add", "agent", l.note, day):
                 stats["links"] += 1
         for e in rf.evidence:
-            ent = ref(*parse_ref(e.entity))
-            row = e.model_dump()
-            row["entity"] = ent
-            row["collected_at"] = e.collected_at.isoformat()
-            fp = db.sha({k: row[k] for k in ("entity", "source", "url", "metric", "value", "region", "collected_at",
-                                             "note")})
+            rec = evidence_record(e)
+            cols = ["day", *EVIDENCE_FIELDS, "fingerprint"]
+            # fingerprint conflict = identical evidence already stored (idempotent); a ref clash with
+            # different content was rejected above and would also violate the unique ref index
             cur = conn.execute(
-                "INSERT OR IGNORE INTO evidence (day, ref, entity, channel, source, url, metric, value, unit, region,"
-                " sample_size, metric_definition, collected_at, confidence, tag, api_call_id, note, fingerprint)"
-                " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
-                (day.isoformat(), e.ref or None, ent, e.channel, e.source, e.url, e.metric, e.value, e.unit,
-                 e.region.upper(), e.sample_size, e.metric_definition, row["collected_at"], e.confidence, e.tag,
-                 e.api_call_id, e.note, fp))
+                f"INSERT INTO evidence ({', '.join(cols)}) VALUES ({', '.join('?' for _ in cols)})"
+                " ON CONFLICT(fingerprint) DO NOTHING",
+                (day.isoformat(), *(rec[k] for k in EVIDENCE_FIELDS), evidence_fingerprint(rec)))
             stats["evidence"] += cur.rowcount
         for g in rf.gaps:
             cur = conn.execute("INSERT OR IGNORE INTO gaps (day, source, note, origin) VALUES (?,?,?,?)",
                                (day.isoformat(), g.source, g.note, "agent"))
             stats["gaps"] += cur.rowcount
+        for c in rf.social_coverage:  # incomplete coverage is a gap too, so it is never silent
+            if c.status != "covered":
+                conn.execute("INSERT OR IGNORE INTO gaps (day, source, note, origin) VALUES (?,?,?,?)",
+                             (day.isoformat(), f"社交调研：{c.platform}", f"{c.status}：{c.note}", "coverage"))
+        # the day's research metadata: one row per day, replaced when the file is re-ingested
+        conn.execute("INSERT OR REPLACE INTO research_days (day, notes, social_coverage_json, updated_at)"
+                     " VALUES (?,?,?,?)", (day.isoformat(), rf.notes,
+                                           db.dumps([c.model_dump() for c in rf.social_coverage]), now_iso()))
     return stats
 
 
