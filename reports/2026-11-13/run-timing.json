@@ -203,6 +203,20 @@
       "stage": "git-push",
       "event": "done",
       "note": "commit+push manual run"
+    },
+    {
+      "at": "2026-11-13T13:08:52+08:00",
+      "commit": "b12f93f",
+      "stage": "base-sync",
+      "event": "start",
+      "note": ""
+    },
+    {
+      "at": "2026-11-13T13:14:26+08:00",
+      "commit": "b12f93f",
+      "stage": "base-sync",
+      "event": "done",
+      "note": "0 rows written. All 2026-11-13 rows already present from morning sync; key-format mismatches (meme id snake vs kebab in tracker/backtest, hashtag '#' prefix in curve/audience, digest version suffix |v6) -> tables not written; 1600/235/53 planned updates skipped (formatting-only diffs). No duplicate keys for 2026-11-13."
     }
   ]
 }
