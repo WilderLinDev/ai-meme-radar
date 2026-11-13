@@ -4,14 +4,15 @@ Local Markdown is authoritative. Each report maps to one Lark document:
 * `daily/DAY`           -> one document per day
 * `opportunity/<id>`    -> one document per opportunity, overwritten with its latest report
 The map (document id, URL, last synced content hash) lives in `lark_docs`, so a
-document is created once and later runs update it. A failed publish is
-recorded and retried next run; it never blocks local report generation.
+document is created once and later runs update it. Publishing is required:
+the preflight gate verifies login, destinations and edit rights before a run
+starts, and a publish failure fails the run (local reports are already
+written; the next run retries only the publish, never duplicating a document).
 Writes go through `lark-cli docs +create / +update` with the user's own login.
 """
 from __future__ import annotations
 
 import json
-import shutil
 import sqlite3
 import subprocess
 from dataclasses import dataclass
@@ -34,7 +35,6 @@ class PublishResult:
     created: list[str]
     updated: list[str]
     failed: list[str]
-    skipped: str = ""
 
 
 def doc_key(report: dict) -> str:
@@ -90,23 +90,10 @@ def _parse(stdout: str) -> dict:
     return data.get("document") or data
 
 
-def available(settings: LarkSettings) -> str:
-    """'' when publishing can run, else why not."""
-    if not settings.enabled:
-        return "lark.enabled = false"
-    if not settings.daily_parent:
-        return "lark.daily_parent is empty"
-    if not shutil.which(settings.cli):
-        return f"{settings.cli} not found on PATH"
-    return ""
-
-
 def publish(conn: sqlite3.Connection, settings: LarkSettings, runner: Runner = subprocess_runner) -> PublishResult:
+    if not settings.daily_parent:
+        raise RuntimeError("[lark] daily_parent is empty; publishing is required (the preflight gate checks this)")
     res = PublishResult([], [], [])
-    why = available(settings) if runner is subprocess_runner else ("" if settings.enabled else "lark.enabled = false")
-    if why:
-        res.skipped = why
-        return res
     for key, report in pending(conn):
         path = Path(report["path"])
         if not path.is_file():

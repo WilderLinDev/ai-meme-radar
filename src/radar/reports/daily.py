@@ -259,9 +259,10 @@ def render(conn: sqlite3.Connection, day: date, paths: Paths) -> tuple[str, list
                    (day.isoformat(), end_of(day)))
     out += ["## 数据缺口", ""] + ([f"- {g['source']}：{g['note']}" for g in gaps] or ["今天没有记录缺口。"]) + [""]
     calls = db.one(conn, "SELECT COUNT(*) AS n, COALESCE(SUM(credits_charged), 0) AS c FROM api_calls"
-                         " WHERE run_day=? AND started_at <= ?", (day.isoformat(), end_of(day)))
+                         " WHERE run_day=? AND started_at <= ? AND purpose != 'preflight'",
+                   (day.isoformat(), end_of(day)))
     out += ["## 数据与口径", "",
-            f"- 哥飞 API：今日 {calls['n'] if calls else 0} 次调用，实际扣除 {num(float(calls['c']) if calls else 0.0)} 积分【已核实·接口返回】。",
+            f"- 哥飞 API：今日 {calls['n'] if calls else 0} 次调用，实际扣除 {num(float(calls['c']) if calls else 0.0)} 积分【已核实·接口返回】（不含开工预检的余额与权限查询）。",
             "- 流量、点击为第三方估算，不等于实际营收；收入数据中的访问量是支付渠道引荐估算。",
             "- 数字标注：【已核实】【第三方读数】【估算】；缺失的序列不插值。", ""]
     records = [{"entity": s["entity"], **_state_record(conn, s, day)} for s in states]

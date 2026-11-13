@@ -114,3 +114,7 @@ _Avoid_: score, verdict
 
 **Lark document（飞书文档）**:
 报告的发布副本。日报每天一份；每个重点机会一份并持续更新。本地 Markdown 为准。
+
+**Preflight gate（开工预检）**:
+每次 `run` 最先执行的二元检查：本地环境、哥飞、飞书（Python 校验）加浏览器与各社交平台（Agent 校验，写入 `preflight.browser.json`）。全部通过才是 READY；任何一项失败或未验证即 NOT READY，不启动任何后续阶段。没有降级运行。
+_Avoid_: warning（预检没有警告级别）, optional check

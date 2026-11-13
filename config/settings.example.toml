@@ -1,17 +1,18 @@
 # Copy to ~/.config/ai-meme-radar/settings.toml ($AMR_CONFIG_DIR overrides the folder).
 # Never commit the real file. Environment variables win over this file:
 #   GEFEI_API_TOKEN, AMR_DATA_DIR, AMR_REPORTS_DIR (and AMR_CONFIG_DIR picks the folder).
-# Every key is optional. Only the Ge Fei token is needed for sync and query APIs.
+# The strict preflight gate needs: the Ge Fei token, enough credits (min_credits), and the Lark
+# destination (daily_parent) with a logged-in lark-cli identity. Nothing runs until all are ready.
 
 [gefei]
 token = ""                    # wc_mcp_… from https://seo.web.cafe/api/ (secret)
 base_url = "https://seo.web.cafe"
 refresh_days = 3              # batches finished this recently are re-fetched (contents may still change)
 keyword_detail_limit = 40     # keyword_detail calls per sync, creative-relevant batch keywords only
+min_credits = 50              # preflight refuses to start below this balance (the day's query budget)
 
 [lark]
-enabled = false               # publishing switch; local reports are written either way
-daily_parent = ""             # Wiki node (or folder) token daily reports are created under
+daily_parent = ""             # Wiki node token daily reports are created under (required)
 opportunity_parent = ""       # same for in-depth reports; empty = daily_parent
 identity = "user"             # lark-cli --as user|bot; log in once with `lark-cli auth login` (not stored here)
 cli = "lark-cli"

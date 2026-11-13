@@ -30,7 +30,7 @@ Never hand-write a number Python can compute. Never change how a deterministic m
 - Watchlist: every `selected=yes` row of `config/watchlist.csv`.
 - Report language: Chinese. Local Markdown is authoritative; Lark is the published copy.
 
-Ask the user only for what preflight prints under `Ask:`, or for a login a live pull rejects: say what it unlocks and which step you skip without it, then continue.
+Ask the user only to fix what the preflight report lists as FAILED (all items in one message). There is no degraded mode: never skip a source, a service or a stage to get the day done.
 
 ## Where things are
 
@@ -42,30 +42,56 @@ Ask the user only for what preflight prints under `Ask:`, or for a login a live 
 - Settings: one loader (`src/radar/config.py`). Precedence: environment variables > `settings.toml` > defaults.
   - `settings.toml` is in `$AMR_CONFIG_DIR`, else `~/.config/ai-meme-radar/`. Template: `config/settings.example.toml`. Every key is optional.
   - Env vars: `GEFEI_API_TOKEN` (secret), `AMR_CONFIG_DIR`, `AMR_DATA_DIR`, `AMR_REPORTS_DIR`.
-  - Required credential: only the Ge Fei token, and only for sync and `call`. Without it, preflight lists it under `Ask:` and the day still runs on browser research.
+  - Required: the Ge Fei token, a balance of at least `[gefei] min_credits` (default 50), `[lark] daily_parent` (a Wiki node token; `opportunity_parent` optional) and a logged-in lark-cli `identity`. Publishing has no off switch.
   - Lark login is lark-cli's own (`lark-cli auth login`); the app stores no Lark credential.
+  - Never ask the user to paste a secret into chat. They set it locally; you rerun.
   - Never paste the token into chat, files in the repo, commit messages or reports. Output is redacted, but don't rely on that.
 
 ## The one entry point
 
 ```bash
-uv run python scripts/run_day.py run [DAY]            # every stage that can run; resumes
+uv run python scripts/run_day.py run [DAY]            # strict preflight gate, then every stage; resumes
 uv run python scripts/run_day.py call TOOL '{json}'   # one recorded Ge Fei call
 uv run python scripts/run_day.py tools [GROUP]        # the live Ge Fei catalog
 uv run python scripts/run_day.py status [DAY]         # stage log, sync retries, report path, every Lark doc + URL
 ```
 
-`run` exits 0 when the day is delivered, 2 when it is waiting for one of your files (it prints which), 1 on failure (input problems are listed all at once), 3 when another run already holds `<data>/run.lock`. Stages: preflight → sync → discover → research → scaffold → decide → backtest → report → publish. Sync and publish failures are recorded as gaps and do not stop the day or touch local reports.
+`run` exits 0 when the day is delivered, 4 when preflight is NOT READY (nothing else ran), 2 when it is waiting for one of your files (it prints which), 1 on failure (input problems are listed all at once), 3 when another run already holds `<data>/run.lock`. Stages: preflight → sync → discover → research → scaffold → decide → backtest → report → publish. A sync or publish failure fails the run; rerun after fixing it and only the unfinished work is redone.
 
-`status DAY` prints the last event of every stage, sync units waiting for retry, the daily report path, and every Lark document as `[type] name | status | URL | local path | error`. Status is synced, stale (local report changed since publishing; the next `run` republishes), failed (with the reason) or unpublished (Lark off). `status`, `tools` and `call` don't take the lock.
+`status DAY` prints the last preflight result, the last event of every stage, sync units waiting for retry, the daily report path, and every Lark document as `[type] name | status | URL | local path | error`. Status is synced, stale (local report changed since publishing; the next `run` republishes), failed (with the reason) or unpublished (not published yet). `status`, `tools` and `call` don't take the lock.
 
 ## Daily procedure
 
-DAY is today in Asia/Shanghai. Start: `git pull && uv sync && uv run python scripts/run_day.py run`.
+DAY is today in Asia/Shanghai. Start: `git pull && uv sync`, then the gate.
+
+### 0. Strict preflight (mandatory, before anything else)
+
+Nothing starts until every required check passes. Every `run` rechecks everything; when one check fails, the run stops with exit 4 and no other stage runs.
+
+1. **Browser checks (you).** Use the connected browser and check each of these for real. A homepage that loads does not count: open the pages your research actually uses, logged in where the platform needs it.
+   - `Browser connection`: the browser integration answers and can open a tab.
+   - `Public web`: an ordinary public article page (for example Wikipedia or Know Your Meme) loads.
+   - `TikTok`, `CapCut`, `Instagram`, `X`, `YouTube`, `Reddit`: a hashtag, search, explore or template page on that site shows content. Check for a login wall, a CAPTCHA or a "content unavailable" page.
+   - `Creative Center`: a Top 100 hashtag or popular page loads on ads.tiktok.com.
+   - `Watchlist`: open at least one selected profile per platform in `config/watchlist.csv`.
+   Never bypass a login, a CAPTCHA or an access restriction; that check fails and the user must fix it. Write `work/DAY/preflight.browser.json`:
+   ```json
+   {"day": "DAY", "checked_at": "2026-11-14T08:05:00+08:00", "browser": "Claude in Chrome",
+    "checks": [{"name": "TikTok", "status": "pass", "access": "logged_in",
+                "urls": ["https://www.tiktok.com/tag/aibaby"], "result": "hashtag page lists videos"},
+               {"name": "Instagram", "status": "failed", "access": "login_required", "urls": [],
+                "result": "redirected to the login page", "reason": "not logged in",
+                "fix": "log in to Instagram in the connected browser"}]}
+   ```
+   Include one entry per name above. `access` is logged_in, not_needed, login_required, blocked or unreachable. `urls` lists the research pages you actually opened. Python rejects a pass with no research page, a URL on the wrong site, a pass with a login wall, a Watchlist pass without a selected profile per platform, and a report from another day. Python never checks login state itself; your report is the only source.
+2. **Python checks (`run`).** The same command checks the local environment (Python, dependencies, settings, environment variables, project config, watchlist, folders, disk, feedback files, SQLite schema and integrity, `uv`, the lock). It checks Ge Fei: the token, the endpoint and live catalog, authentication and balance via `GET /api/v1/me`, credits ≥ `min_credits`, and free page-1 calls for data-service access. It checks Lark read-only: `lark-cli` runs, `auth status --verify` for the identity, each destination Wiki node exists with edit permission, `docs +create/+update` are available, and every document due for an update is still editable. No research credits are spent and nothing is written to Lark.
+3. **One report.** `run` prints every check as PASS or FAILED with what it saw, the reason and the fix, and saves it to `work/DAY/preflight.json`. READY only if every check passed.
+4. **If NOT READY:** send the user one message listing every FAILED item and exactly what to do. Credentials are set locally, never pasted into chat. Then stop and wait. Do not start research, run `call`, write `research.json`, or ask about items one by one.
+5. **When the user says it's fixed:** redo the browser checks that failed and rewrite `preflight.browser.json`, then rerun `run`. If the gate is READY, the workflow continues without asking for confirmation. If anything still fails, go back to step 4.
 
 ### 1. Ge Fei sync (Python, automatic)
 
-The first run pulls every accessible batch of emerging keywords, new-site launches, website discovery (with 28-day snapshots) and every revenue month (monthly and 28-day reports, all pages). Later runs pull only new batches, re-pull batches finished in the last `refresh_days` and the current/previous revenue month, and retry failed units. Locked data (`data_locked`) is recorded as a gap, not retried. Every response is stored raw in `api_calls`, normalized into snapshot tables, and costs nothing in credits.
+The first run pulls every accessible batch of emerging keywords, new-site launches, website discovery (with 28-day snapshots) and every revenue month (monthly and 28-day reports, all pages). Later runs pull only new batches, re-pull batches finished in the last `refresh_days` and the current/previous revenue month, and retry failed units. A batch that is individually locked (`data_locked`) is recorded as a gap, not retried; a failed unit fails the run and is retried on the next run. Every response is stored raw in `api_calls`, normalized into snapshot tables, and costs nothing in credits.
 
 ### 2. Discover (Python writes `work/DAY/candidates.json`)
 
@@ -128,7 +154,7 @@ Rerun until the day exits 0.
 
 ### 6. Deliver
 
-`run` writes `reports/daily/DAY.md` and the in-depth reports, then publishes them to Lark when enabled. Reply in chat with: the key opportunities (four attributes + one line each), new early signals, decision changes, the backtest line, gaps, credits spent today, local report paths and the Lark URLs (copy them from `status DAY`; report any document that is not `synced`, with its error). If nothing changed, say so in one line.
+`run` writes `reports/daily/DAY.md` and the in-depth reports, then publishes them to Lark. Reply in chat with: the key opportunities (four attributes + one line each), new early signals, decision changes, the backtest line, gaps, credits spent today, local report paths and the Lark URLs (copy them from `status DAY`; report any document that is not `synced`, with its error). If nothing changed, say so in one line.
 
 ## Human feedback
 
@@ -143,13 +169,14 @@ People change decisions, priorities, lifecycle, links or research direction by d
 
 ## Lark
 
-Only finished reports go to Lark: one document per daily report, one document per key opportunity (overwritten with its latest in-depth report). Never upload the database, raw API data, batches, social data or intermediate files. Settings `[lark]`: `enabled`, `daily_parent` (Wiki node token), `opportunity_parent`, `identity`. Publishing uses `lark-cli docs +create/+update` with the user's login. A failure is a gap; the next run retries it and never creates a duplicate, because document ids live in `lark_docs`.
+Only finished reports go to Lark: one document per daily report, one document per key opportunity (overwritten with its latest in-depth report). Never upload the database, raw API data, batches, social data or intermediate files. Settings `[lark]`: `daily_parent` (Wiki node token, required), `opportunity_parent`, `identity`. Destinations must be Wiki nodes, because only those can be checked for edit permission without writing. Publishing uses `lark-cli docs +create/+update` with the user's login. A publish failure fails the run; the next run (after the gate) retries only the unpublished documents and never creates a duplicate, because document ids live in `lark_docs`.
 
 ## Recovery
 
-Rerun `run` with the same DAY. Finished sync units are skipped and failed ones retried. Ingest is idempotent, and unchanged reports are neither rewritten nor republished. Use `status DAY` to see where it stopped.
+Rerun `run` with the same DAY. The preflight gate runs first every time. Finished sync units are skipped and failed ones retried. Ingest is idempotent, and unchanged reports are neither rewritten nor republished. Use `status DAY` to see where it stopped.
 - Reports are reproducible: a report for day D only uses what was ingested into the database by the end of D (rules in `docs/research-method.md`, "Time"). Rebuilding an old day never pulls in later data, and an early `collected_at` or feedback `at` does not put anything into an older report.
 - Research and assessments can only be written for today. Rerunning an old day with identical files is a no-op; a changed file for a past day is refused ("Backdated or future research is not accepted"). Put late findings in today's research.json, with their true `collected_at`. Feedback can be added on any day and counts from when it was ingested.
+- Exit 4: NOT READY. Follow Daily procedure step 0 (report everything, wait, recheck, continue).
 - Exit 3: another run is in progress. Wait for it; never delete `run.lock`. A leftover file from a crashed run doesn't block anything, because the OS releases the lock when the process dies.
 - Rejected input file: fix that file. Never edit the database to get past a check.
 - `schema version N; this code needs M`: the database was made by an incompatible version. There are no migrations. Ask the user before moving `radar.db` aside; a fresh store is then created on the next run.

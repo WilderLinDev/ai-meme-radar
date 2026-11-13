@@ -1,38 +1,15 @@
 from __future__ import annotations
 
-import json
 from datetime import timedelta
 
 from radar import db, lark, pipeline
-from radar.config import LarkSettings
-from conftest import DAY1, advance, DEEP, assessment, research_doc, write
+from conftest import DAY1, DEEP, FakeLark, assessment, make_ctx, research_doc, write
 
 D2 = DAY1 + timedelta(days=1)
 
 
-class FakeLark:
-    def __init__(self):
-        self.calls = []
-        self.fail = False
-
-    def __call__(self, args, cwd):
-        self.calls.append(args)
-        content = args[args.index("--content") + 1]
-        assert content.startswith("@") and (cwd / content[1:]).is_file()
-        if self.fail:
-            return 1, "", "permission denied"
-        if "+create" in args:
-            n = len(self.calls)
-            return 0, json.dumps({"ok": True, "data": {"document": {"document_id": f"doc{n}",
-                                                                    "url": f"https://x.feishu.cn/docx/doc{n}"}}}), ""
-        return 0, json.dumps({"ok": True, "data": {"document": {"revision_id": 2}}}), ""
-
-
 def ctx(paths, conn, settings, fake, larkfake, day=DAY1):
-    advance(day)  # a run for `day` happens on `day`
-    settings.lark = LarkSettings(enabled=True, daily_parent="wikiDaily", opportunity_parent="wikiOpp")
-    return pipeline.Context(day=day, settings=settings, paths=paths, conn=conn, transport=fake,
-                            lark_runner=larkfake, say=lambda s: None)
+    return make_ctx(paths, conn, settings, fake, larkfake, day)
 
 
 def day1_files(paths):
@@ -68,16 +45,18 @@ def test_full_run_waits_then_delivers_and_resumes(paths, conn, settings, fake):
     docs = {d["doc_key"]: d for d in lark.documents(conn)}
     assert set(docs) == {"daily/2026-11-13", "opportunity/baby-dance-template"}
     assert all(d["status"] == "synced" and d["url"] for d in docs.values())
-    assert lk.calls[0][lk.calls[0].index("--parent-token") + 1] in ("wikiDaily", "wikiOpp")
+    first = lk.publishes[0]
+    assert first[first.index("--parent-token") + 1] in ("wikiDaily", "wikiOpp")
 
-    # rerun: Ge Fei not re-synced, nothing republished
-    n_calls, n_lark = len(fake.calls), len(lk.calls)
+    # rerun: the gate is rechecked, but Ge Fei batches are not re-synced and nothing is republished
+    n_calls, n_lark = len(fake.calls), len(lk.publishes)
     assert pipeline.run(c) == pipeline.DONE
-    assert len(lk.calls) == n_lark
-    assert not [p for m, p, q, b in fake.calls[n_calls:] if "/batches/" in p]
+    assert len(lk.publishes) == n_lark
+    assert not [p for m, p, q, b in fake.calls[n_calls:] if "/batches/" in p and p.count("/") > 4]
+    assert paths.daily_report(DAY1).read_text(encoding="utf-8") == daily  # preflight calls do not change it
 
     # raw Ge Fei data stays local: nothing but report markdown went to Lark
-    for args in lk.calls:
+    for args in lk.publishes:
         assert args[args.index("--content") + 1].endswith(".md")
 
 
@@ -95,18 +74,18 @@ def test_day_two_reports_changes_only_and_lark_updates_in_place(paths, conn, set
         {"entity": "opportunity:baby-dance-template", "field": "priority", "value": "P1", "reason": "capacity",
          "author": "pm", "at": f"{D2.isoformat()}T08:00:00+08:00"}]})
     lk.fail = True
-    assert pipeline.run(ctx(paths, conn, settings, fake, lk, D2)) == pipeline.DONE  # Lark failure is soft
+    assert pipeline.run(ctx(paths, conn, settings, fake, lk, D2)) == pipeline.FAILED  # delivery is required
     daily = paths.daily_report(D2).read_text(encoding="utf-8")
     assert "生命周期 早期信号 → 上升期" in daily
     assert "立即做/P0 → 立即做/P1（人工）" in daily
     assert "人工修改：优先级 P0 → P1（pm：capacity）" in daily
     assert paths.daily_report(D2).is_file()
     assert db.one(conn, "SELECT status FROM lark_docs WHERE doc_key='daily/2026-11-14'")["status"] == "failed"
-    assert db.one(conn, "SELECT 1 FROM gaps WHERE day=? AND source='飞书发布'", (D2.isoformat(),))
+    assert db.one(conn, "SELECT event FROM run_events WHERE stage='publish' ORDER BY id DESC")["event"] == "failed"
 
     lk.fail = False
     assert pipeline.run(ctx(paths, conn, settings, fake, lk, D2)) == pipeline.DONE
-    created = [a for a in lk.calls if "+create" in a and not lk.fail]
+    created = [a for a in lk.publishes if "+create" in a]
     assert db.one(conn, "SELECT status FROM lark_docs WHERE doc_key='daily/2026-11-14'")["status"] == "synced"
     # the opportunity doc is never duplicated: day 2 did not re-assess it, and its doc id is unchanged
     titles = [a[a.index("--title") + 1] for a in created]
@@ -125,12 +104,3 @@ def test_unchanged_entities_are_one_liners(paths, conn, settings, fake):
     assert "较上次日报无变化，详见深度报告" in daily
     assert "### Baby Dance AI Template" not in daily  # not re-expanded
     assert "没有决策或优先级变化" in daily
-
-
-def test_no_token_still_produces_reports(paths, conn, settings, fake):
-    settings.gefei.token = ""
-    day1_files(paths)
-    c = ctx(paths, conn, settings, fake, FakeLark())
-    assert pipeline.run(c) == pipeline.DONE
-    assert not fake.calls
-    assert "哥飞 API：未配置 token" in paths.daily_report(DAY1).read_text(encoding="utf-8")

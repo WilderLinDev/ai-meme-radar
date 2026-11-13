@@ -10,14 +10,14 @@ Then, as needed:
 2. `docs/research-method.md` - lifecycle, decision, priority, confidence, the seven dimensions, backtests.
 3. `docs/adr/` - why the repo is shaped this way.
 
-Entry point: `uv run python scripts/run_day.py run|call|tools|status`. Tests: `uv run pytest` (CI runs the same on every push and PR to `main`, with no credentials).
+Entry point: `uv run python scripts/run_day.py run|call|tools|status`. `run` starts with a strict preflight gate (exit 4 = NOT READY, nothing ran); the SKILL's step 0 says how to do the browser checks. Tests: `uv run pytest` (CI runs the same on every push and PR to `main`, with no credentials).
 
 Configuration: environment variables (`GEFEI_API_TOKEN`, `AMR_CONFIG_DIR`, `AMR_DATA_DIR`, `AMR_REPORTS_DIR`) override `~/.config/ai-meme-radar/settings.toml`, which overrides defaults. The repo is public: never commit a token or a real `settings.toml`.
 
 Honesty: never invent posts, links or numbers. Tag numbers in free text 【已核实】, 【第三方读数】 or 【估算】. Do not interpolate. Record what you could not get as a gap.
 
 ```
-src/radar/          config, db (SQLite schema), text, decisions, backtest, lark, pipeline
+src/radar/          config, db (SQLite schema), text, decisions, backtest, lark, preflight (the gate), pipeline
 src/radar/gefei/    catalog (live), client (recorded calls), sync (resumable), normalize
 src/radar/research/ models (input schemas), ingest, discover, metrics
 src/radar/reports/  daily, deep (Markdown)

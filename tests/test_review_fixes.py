@@ -14,7 +14,7 @@ from radar.reports import daily, deep
 from radar.reports.daily import tracked_move
 from radar.research.discover import Matcher, group
 from radar.research.ingest import InputError, ingest_research
-from conftest import DAY1, advance, DEEP, assessment, research_doc, write
+from conftest import DAY1, DEEP, FakeLark, advance, assessment, make_ctx, research_doc, write
 
 
 def ingest(conn, paths, doc, day=DAY1):
@@ -209,7 +209,7 @@ def test_status_lists_every_lark_document_with_url(conn, paths):
         if "深度研究" in " ".join(args):
             return 1, "", "no permission on wiki node"
         return 0, json.dumps({"data": {"document": {"document_id": "d1", "url": "https://x.feishu.cn/docx/d1"}}}), ""
-    lark.publish(conn, LarkSettings(enabled=True, daily_parent="w"), runner)
+    lark.publish(conn, LarkSettings(daily_parent="w"), runner)
     docs = {d["type"]: d for d in lark.documents(conn)}
     assert docs["daily"]["status"] == "synced" and docs["daily"]["url"] == "https://x.feishu.cn/docx/d1"
     assert docs["opportunity"]["status"] == "failed" and "no permission" in docs["opportunity"]["error"]
@@ -226,12 +226,16 @@ def test_status_lists_every_lark_document_with_url(conn, paths):
     assert {d["type"]: d["status"] for d in lark.documents(conn)}["daily"] == "stale"
 
 
-def test_unpublished_when_lark_disabled(conn, paths):
+def test_publishing_cannot_be_switched_off(conn, paths, tmp_path):
     ingest(conn, paths, research_doc())
     assess(conn, paths, [assessment("trend:ai-baby-dance")])
     daily.build(conn, DAY1, paths)
-    assert lark.publish(conn, LarkSettings(enabled=False), lambda a, c: (0, "", "")).skipped
     assert [d["status"] for d in lark.documents(conn)] == ["unpublished"]
+    with pytest.raises(RuntimeError, match="daily_parent"):
+        lark.publish(conn, LarkSettings(), lambda a, c: (0, "", ""))
+    toml(tmp_path / "cfg", "[lark]\nenabled = false\n")
+    with pytest.raises(ConfigError, match="required"):
+        load_settings(env={"AMR_CONFIG_DIR": str(tmp_path / "cfg")})
 
 
 # ---- 7. settings ----
@@ -242,10 +246,11 @@ def toml(dirpath, text):
 
 def test_settings_env_toml_precedence_and_defaults(tmp_path):
     cfg = tmp_path / "cfg"
-    toml(cfg, '[gefei]\ntoken = "wc_mcp_fromtoml"\n[lark]\nenabled = true\ndaily_parent = "node"\n'
+    toml(cfg, '[gefei]\ntoken = "wc_mcp_fromtoml"\nmin_credits = 80\n[lark]\ndaily_parent = "node"\n'
               '[paths]\ndata_dir = "/toml/data"\nreports_dir = "/toml/reports"\n')
     s = load_settings(env={"AMR_CONFIG_DIR": str(cfg)})                       # custom config dir + TOML fallback
-    assert s.token == "wc_mcp_fromtoml" and s.token_from == "toml" and s.lark.enabled
+    assert s.token == "wc_mcp_fromtoml" and s.token_from == "toml" and s.lark.daily_parent == "node"
+    assert s.gefei.min_credits == 80
     assert Paths.resolve(s).db.as_posix() == "/toml/data/radar.db"
     assert Paths.resolve(s).daily_report(DAY1).as_posix() == "/toml/reports/daily/2026-11-13.md"
 
@@ -256,7 +261,7 @@ def test_settings_env_toml_precedence_and_defaults(tmp_path):
     assert Paths.resolve(s).reports.as_posix() == "/env/reports"
 
     s = load_settings(env={"AMR_CONFIG_DIR": str(tmp_path / "none")})         # no file: safe defaults
-    assert s.source is None and s.token == "" and not s.lark.enabled
+    assert s.source is None and s.token == "" and not s.lark.daily_parent and s.gefei.min_credits == 50
     assert Paths.resolve(s).root.name == "ai-meme-radar-data"
     s = load_settings(env={"AMR_CONFIG_DIR": str(tmp_path / "none"), "GEFEI_API_TOKEN": "wc_mcp_e"})
     assert s.token == "wc_mcp_e"                                               # env alone is enough
@@ -334,7 +339,7 @@ def test_deep_report_evidence_covers_related_entities_only(conn, paths):
 
 # ---- 9. single-instance lock ----
 def test_run_lock_blocks_overlap_and_releases(paths, conn, settings, fake):
-    ctx = pipeline.Context(day=DAY1, settings=settings, paths=paths, conn=conn, transport=fake, say=lambda s: None)
+    ctx = make_ctx(paths, conn, settings, fake, FakeLark())
     with pipeline.run_lock(paths.lock):
         assert pipeline.run(ctx) == pipeline.BUSY
         with pytest.raises(pipeline.Busy, match="pid"):

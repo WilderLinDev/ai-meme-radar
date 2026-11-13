@@ -6,15 +6,17 @@
     uv run python scripts/run_day.py tools  [GROUP]
     uv run python scripts/run_day.py status [DAY]
 
-run     Runs every stage that can run (preflight, sync, discover, research, scaffold, decide,
-        backtest, report, publish) and resumes from what is already done. Exit 0 = delivered,
-        2 = waiting for an agent file in <data>/work/DAY/, 1 = failed (see the message),
-        3 = another run is in progress (single-instance lock on <data>/run.lock).
+run     Strict preflight gate first: every prerequisite (local, Ge Fei, Lark, and the agent's browser
+        report work/DAY/preflight.browser.json) is checked and reported together; unless all pass,
+        nothing else starts. Then sync, discover, research, scaffold, decide, backtest, report,
+        publish, resuming from what is already done. Exit 0 = delivered, 4 = NOT READY (fix every
+        FAILED check, then run again), 2 = waiting for an agent file in <data>/work/DAY/,
+        1 = failed (see the message), 3 = another run is in progress (lock on <data>/run.lock).
 call    Calls one Ge Fei tool through the recorded client: request, response, requestId and credits
         are stored in SQLite; an identical successful call inside the reuse window is served from
         SQLite instead. Prints {"call_id", "cached", "credits", "data"} as JSON.
 tools   Lists the live Ge Fei catalog (refreshed from /api/v1/tools and /api/openapi.json).
-status  Last event of every stage for DAY, sync units waiting for retry, the daily report path, and every
+status  Last preflight result and last event of every stage for DAY, sync units waiting for retry, the daily report path, and every
         Lark document: name, type, status (synced/stale/failed/unpublished), URL, local path, error.
 
 DAY defaults to today in Asia/Shanghai. Settings: environment variables (GEFEI_API_TOKEN, AMR_CONFIG_DIR,
@@ -25,13 +27,14 @@ from __future__ import annotations
 
 import argparse
 import json
+import sqlite3
 import sys
 from datetime import date, timedelta
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
-from radar import pipeline  # noqa: E402
+from radar import pipeline, preflight  # noqa: E402
 from radar.config import ConfigError, Paths, load_settings, today  # noqa: E402
 from radar.db import SchemaError  # noqa: E402
 from radar.gefei.client import Client, GefeiError  # noqa: E402
@@ -57,14 +60,18 @@ def main(argv: list[str] | None = None) -> int:
     s.add_argument("day", nargs="?")
     a = ap.parse_args(argv)
 
+    day = date.fromisoformat(a.day) if getattr(a, "day", None) else today()
     try:
         settings = load_settings()
         paths = Paths.resolve(settings)
         conn = pipeline.open_db(paths)
-    except (ConfigError, SchemaError) as e:
+    except (ConfigError, SchemaError, sqlite3.Error, OSError) as e:
+        if a.cmd == "run":  # still a full preflight report, not a bare error
+            what = "Settings" if isinstance(e, ConfigError) else "Data folder and SQLite database"
+            print(preflight.startup_failure(day, what, f"{type(e).__name__}: {e}").render())
+            return pipeline.NOT_READY
         print(f"error: {e}", file=sys.stderr)
         return 1
-    day = date.fromisoformat(a.day) if getattr(a, "day", None) else today()
 
     if a.cmd == "run":
         services = tuple(x for x in a.services.split(",") if x)
@@ -75,7 +82,7 @@ def main(argv: list[str] | None = None) -> int:
         return pipeline.run(ctx)
 
     if a.cmd == "status":
-        pipeline.status(conn, day)
+        pipeline.status(conn, day, paths=paths)
         return 0
 
     client = Client(conn, settings.token, settings.gefei.base_url, run_day=today())

@@ -12,11 +12,12 @@ AI 创作产品的趋势发现、市场研究与模板机会评估系统。每�
 ```bash
 uv sync
 uv run pytest
-cp config/settings.example.toml ~/.config/ai-meme-radar/settings.toml   # 填入哥飞 token，按需开启飞书
+cp config/settings.example.toml ~/.config/ai-meme-radar/settings.toml   # 填入哥飞 token 与飞书 Wiki 节点
+lark-cli auth login
 uv run python scripts/run_day.py run
 ```
 
-`run` 会执行所有能执行的阶段；需要 Agent 写入研究文件时以退出码 2 停下并说明要写什么，写好后再次运行即可从断点继续。已有运行在进行时以退出码 3 退出。`status` 查看各阶段进度、日报路径和所有飞书文档的状态与链接。
+`run` 先做严格的开工预检：本地环境、哥飞（token、余额、数据服务权限）、飞书（登录、目标节点与编辑权限），以及 Agent 写入的浏览器与各社交平台检查结果。所有问题一次性列出，任何一项未通过就以退出码 4 停下，不启动任何阶段；修好后再次运行会重新检查并自动继续。预检通过后，`run` 会执行所有能执行的阶段；需要 Agent 写入研究文件时以退出码 2 停下并说明要写什么，写好后再次运行即可从断点继续。已有运行在进行时以退出码 3 退出。`status` 查看各阶段进度、日报路径和所有飞书文档的状态与链接。
 
 ## 配置
 
@@ -24,7 +25,7 @@ uv run python scripts/run_day.py run
 
 | 环境变量 | 作用 | 对应 TOML |
 | --- | --- | --- |
-| `GEFEI_API_TOKEN` | 哥飞 API token（密钥，仅同步与 `call` 需要） | `[gefei] token` |
+| `GEFEI_API_TOKEN` | 哥飞 API token（密钥，必需） | `[gefei] token` |
 | `AMR_CONFIG_DIR` | `settings.toml` 所在目录，默认 `~/.config/ai-meme-radar/` | — |
 | `AMR_DATA_DIR` | 数据目录，默认 `~/ai-meme-radar-data` | `[paths] data_dir` |
 | `AMR_REPORTS_DIR` | 报告目录，默认 `<数据目录>/reports` | `[paths] reports_dir` |

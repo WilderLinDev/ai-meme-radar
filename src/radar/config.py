@@ -98,13 +98,16 @@ class GefeiSettings:
     base_url: str = GEFEI_BASE_URL
     keyword_detail_limit: int = 40  # keyword_detail calls per sync for creative-relevant new keywords
     refresh_days: int = 3  # batches finished within this many days are re-fetched (content may update)
+    min_credits: float = 50  # preflight refuses to start below this balance (a day's query budget)
 
 
 @dataclass
 class LarkSettings:
-    """Lark login is lark-cli's own (`lark-cli auth login`); no Lark credentials live here."""
-    enabled: bool = False
-    daily_parent: str = ""  # Wiki node token (or folder token) that daily reports go under
+    """Lark login is lark-cli's own (`lark-cli auth login`); no Lark credentials live here.
+
+    Publishing is a required delivery step: there is no switch to turn it off.
+    """
+    daily_parent: str = ""  # Wiki node token that daily reports go under
     opportunity_parent: str = ""  # same for in-depth reports; empty = daily_parent
     identity: str = "user"  # lark-cli --as user|bot
     cli: str = "lark-cli"
@@ -164,6 +167,9 @@ def load_settings(path: Path | None = None, env: Mapping[str, str] | None = None
         except tomllib.TOMLDecodeError as e:
             raise ConfigError(f"{path}: invalid TOML ({e})") from None
     g, lk, p = _section(raw, "gefei", path), _section(raw, "lark", path), _section(raw, "paths", path)
+    if "enabled" in lk:
+        raise ConfigError(f"{path}: [lark] enabled is not supported: Lark publishing is a required step; "
+                          "remove the key and set daily_parent")
     try:
         s = Settings(
             gefei=GefeiSettings(
@@ -171,9 +177,9 @@ def load_settings(path: Path | None = None, env: Mapping[str, str] | None = None
                 base_url=str(g.get("base_url", GEFEI_BASE_URL)).rstrip("/"),
                 keyword_detail_limit=int(g.get("keyword_detail_limit", 40)),
                 refresh_days=int(g.get("refresh_days", 3)),
+                min_credits=float(g.get("min_credits", 50)),
             ),
             lark=LarkSettings(
-                enabled=bool(lk.get("enabled", False)),
                 daily_parent=str(lk.get("daily_parent", "")),
                 opportunity_parent=str(lk.get("opportunity_parent", "")),
                 identity=str(lk.get("identity", "user")),

@@ -2,16 +2,19 @@
 
     preflight -> sync -> discover -> research* -> scaffold -> decide* -> backtest -> report -> publish
 
-Stages marked * wait for an agent file in work/DAY/ (research.json,
-assessments.json). A run stops there with exit code 2 and says what to write;
-the next run picks up where it stopped. Every stage start / end is logged to
-`run_events` with timing and the Git commit. Ingest stages are idempotent, so
-rerunning a finished day is safe and cheap.
+`preflight` is a strict gate (radar.preflight): every invocation rechecks every prerequisite
+(local, Ge Fei, Lark, and the agent's browser report) and, unless all pass, stops with exit code 4
+before any other stage starts. There is no degraded mode: a failure in sync or publish fails the run.
+Stages marked * wait for an agent file in work/DAY/ (research.json, assessments.json). A run stops
+there with exit code 2 and says what to write; the next run picks up where it stopped (finished
+stages are idempotent and skip their work). Every stage start / end is logged to `run_events`.
 """
 from __future__ import annotations
 
 import fcntl
+import json
 import os
+import shutil
 import sqlite3
 import subprocess
 from contextlib import contextmanager
@@ -21,15 +24,15 @@ from datetime import date
 from pathlib import Path
 from typing import Callable
 
-from . import backtest, db, decisions, lark
+from . import backtest, db, decisions, lark, preflight as gate
 from .config import REPO, Paths, Settings, now_iso, today
-from .gefei.client import Client, GefeiError, Transport, urllib_transport
+from .gefei.client import Client, Transport, urllib_transport
 from .gefei.sync import SERVICES, Syncer, credits_spent, pending_units
 from .reports import daily, deep
 from .research.discover import discover
 from .research.ingest import InputError, ingest_research, record_gap
 
-DONE, WAITING, FAILED, BUSY = 0, 2, 1, 3
+DONE, WAITING, FAILED, BUSY, NOT_READY = 0, 2, 1, 3, 4
 
 
 @dataclass
@@ -43,6 +46,7 @@ class Context:
     resync: bool = False
     services: tuple[str, ...] = SERVICES
     say: Callable[[str], None] = print
+    which: Callable[[str], str | None] = shutil.which
 
     @property
     def work(self) -> Path:
@@ -51,6 +55,13 @@ class Context:
 
 class Wait(Exception):
     pass
+
+
+class NotReady(Exception):
+    def __init__(self, report: gate.Report):
+        super().__init__(f"{len(report.failed)} of {len(report.checks)} checks failed: "
+                         + ", ".join(c.name for c in report.failed))
+        self.report = report
 
 
 def commit() -> str:
@@ -74,40 +85,29 @@ def last_event(conn: sqlite3.Connection, day: date, stage: str) -> dict | None:
 
 # ---- stages ----
 def preflight(ctx: Context) -> str:
-    present, ask, skipped = [f"data folder {ctx.paths.root}", f"database {ctx.paths.db}"], [], []
-    if ctx.settings.token:
-        present.append(f"Ge Fei token (from {ctx.settings.token_from})")
-    else:
-        ask.append("Ge Fei API token (wc_mcp_…, from https://seo.web.cafe/api/) in settings.toml [gefei] token or "
-                   "$GEFEI_API_TOKEN: unlocks data-service sync and every query API. Without it: sync is skipped "
-                   "and search/product/market evidence must come from the browser.")
-    why = lark.available(ctx.settings.lark)
-    (skipped if why else present).append(f"Lark publishing ({why or 'on'})")
-    lines = ["Present: " + "; ".join(present)] + (["Ask: " + a for a in ask]) + \
-            (["Skipped: " + s for s in skipped] if skipped else [])
-    for line in lines:
-        ctx.say(line)
-    return f"{len(present)} present, {len(ask)} ask, {len(skipped)} skipped"
+    rep = gate.run_checks(ctx)
+    try:
+        (ctx.work / gate.REPORT_FILE).write_text(json.dumps(rep.to_json(), ensure_ascii=False, indent=2),
+                                                 encoding="utf-8")
+    except OSError as e:  # an unwritable work folder is itself a failed check in the report
+        ctx.say(f"(could not save {gate.REPORT_FILE}: {e.strerror or e})")
+    ctx.say(rep.render())
+    if not rep.ready:
+        raise NotReady(rep)
+    return f"READY: {len(rep.checks)} checks passed"
 
 
 def sync(ctx: Context) -> str:
-    if not ctx.settings.token:
-        record_gap(ctx.conn, ctx.day, "哥飞 API", "未配置 token，跳过数据服务同步与查询类接口")
-        return "skipped: no token"
     done_today = db.one(ctx.conn, "SELECT 1 FROM run_events WHERE day=? AND stage='sync' AND event='done'",
                         (ctx.day.isoformat(),))
     if done_today and not ctx.resync and not pending_units(ctx.conn):
         return "skipped: already synced today (use --resync to pull again)"
     client = Client(ctx.conn, ctx.settings.token, ctx.settings.gefei.base_url, ctx.transport, ctx.day)
-    try:
-        rep = Syncer(ctx.conn, client, ctx.settings).run(ctx.services)
-    except GefeiError as e:
-        record_gap(ctx.conn, ctx.day, "哥飞 API", ctx.settings.redact(f"同步中止：{e}"))
-        raise
+    rep = Syncer(ctx.conn, client, ctx.settings).run(ctx.services)  # a fatal API error fails the run
     for item in rep.locked:
         record_gap(ctx.conn, ctx.day, "哥飞数据服务", f"未解锁或不存在：{item}")
-    for item in rep.failed:
-        record_gap(ctx.conn, ctx.day, "哥飞数据服务", f"失败，下次重试：{item}")
+    if rep.failed:  # no partial data: stop here; the next run retries only the failed units
+        raise RuntimeError(f"{len(rep.failed)} sync units failed (retried next run): {rep.failed[:3]}")
     new = ", ".join(f"{k} {len(v)}" for k, v in rep.new_batches.items()) or "none"
     return f"fetched {rep.fetched} skipped {rep.skipped} failed {len(rep.failed)} locked {len(rep.locked)} new {new}"
 
@@ -153,10 +153,8 @@ def report(ctx: Context) -> str:
 
 def publish(ctx: Context) -> str:
     res = lark.publish(ctx.conn, ctx.settings.lark, ctx.lark_runner)
-    if res.skipped:
-        return f"skipped: {res.skipped}"
-    for f in res.failed:
-        record_gap(ctx.conn, ctx.day, "飞书发布", f"失败，下次运行重试：{f}")
+    if res.failed:  # delivery is required: the run fails, and the next run retries only these documents
+        raise RuntimeError(f"Lark publish failed for {len(res.failed)} documents: {res.failed[:3]}")
     return f"created {res.created} updated {res.updated} failed {res.failed}"
 
 
@@ -164,7 +162,6 @@ STAGES: list[tuple[str, Callable[[Context], str]]] = [
     ("preflight", preflight), ("sync", sync), ("discover", discover_stage), ("research", research),
     ("scaffold", scaffold), ("decide", decide), ("backtest", backtest_stage), ("report", report),
     ("publish", publish)]
-SOFT = {"sync", "publish"}  # failure is recorded as a gap; research and reports still go ahead
 
 
 class Busy(RuntimeError):
@@ -214,12 +211,18 @@ def run(ctx: Context) -> int:
 
 
 def _run(ctx: Context) -> int:
-    ctx.work.mkdir(parents=True, exist_ok=True)
+    try:
+        ctx.work.mkdir(parents=True, exist_ok=True)
+    except OSError:
+        pass  # reported by the gate's folder check
     for name, fn in STAGES:
         t0 = time.monotonic()
         log(ctx.conn, ctx.day, name, "start")
         try:
             note = fn(ctx)
+        except NotReady as e:
+            log(ctx.conn, ctx.day, name, "failed", round(time.monotonic() - t0, 2), ctx.settings.redact(str(e)))
+            return NOT_READY
         except Wait as w:
             log(ctx.conn, ctx.day, name, "waiting", round(time.monotonic() - t0, 2), ctx.settings.redact(str(w)))
             ctx.say(f"[{name}] waiting for agent: {w}")
@@ -232,8 +235,6 @@ def _run(ctx: Context) -> int:
             log(ctx.conn, ctx.day, name, "failed", round(time.monotonic() - t0, 2),
                 ctx.settings.redact(f"{type(e).__name__}: {e}"))
             ctx.say(f"[{name}] failed: {type(e).__name__}: {e}")
-            if name in SOFT:
-                continue
             return FAILED
         secs = round(time.monotonic() - t0, 2)
         note = ctx.settings.redact(note)
@@ -243,7 +244,7 @@ def _run(ctx: Context) -> int:
     return DONE
 
 
-def status(conn: sqlite3.Connection, day: date, say: Callable[[str], None] = print) -> None:
+def status(conn: sqlite3.Connection, day: date, say: Callable[[str], None] = print, paths: Paths | None = None) -> None:
     for name, _ in STAGES:
         e = last_event(conn, day, name)
         if e:
@@ -253,6 +254,11 @@ def status(conn: sqlite3.Connection, day: date, say: Callable[[str], None] = pri
     units = pending_units(conn)
     if units:
         say(f"sync units to retry: {len(units)} (e.g. {units[0]['kind']}:{units[0]['item_key']}: {units[0]['last_error']})")
+    pf = paths.work(day) / gate.REPORT_FILE if paths else None
+    if pf and pf.is_file():
+        doc = json.loads(pf.read_text(encoding="utf-8"))
+        state = "READY" if doc["ready"] else f"NOT READY (failed: {', '.join(doc['failed'])})"
+        say(f"preflight: {state} at {doc['checked_at']} ({pf})")
     report = db.one(conn, "SELECT path FROM reports WHERE key=?", (f"daily/{day.isoformat()}",))
     say(f"daily report: {report['path'] if report else '- (not built yet)'}")
     docs = lark.documents(conn)

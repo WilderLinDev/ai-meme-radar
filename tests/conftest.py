@@ -67,12 +67,24 @@ class FakeGefei:
         self.locked: set[str] = set()
         self.fail_once: set[str] = set()
         self.query: dict[str, dict] = {"keyword_volume": {"rows": [{"keyword": "ai baby dance", "volume": 12100}]}}
+        self.balance: float | None = 500  # credits.balance on /api/v1/me (None = not reported)
+        self.reject_token = False  # every authenticated call answers 401
+        self.offline = False  # the network is down
 
     def __call__(self, method, url, headers, body):
         u = urlparse(url)
         q = {k: v[0] for k, v in parse_qs(u.query).items()}
         payload = json.loads(body) if body else None
         self.calls.append((method, u.path, q, payload))
+        if self.offline:
+            raise OSError("[Errno 8] nodename nor servname provided")
+        if self.reject_token and u.path not in ("/api/v1/tools", "/api/openapi.json"):
+            return 401, {}, json.dumps({"ok": False, "code": "auth", "error": "invalid token",
+                                        "requestId": "req_" + "d" * 32}).encode()
+        if u.path == "/api/v1/me":
+            credits = {"charged": 0} if self.balance is None else {"charged": 0, "balance": self.balance}
+            return 200, {}, json.dumps({"ok": True, "requestId": "req_" + "c" * 32, "credits": credits,
+                                        "data": {"plan": "member"}}).encode()
         if u.path == "/api/v1/tools":
             return 200, {}, json.dumps(self.tools).encode()
         if u.path == "/api/openapi.json":
@@ -127,6 +139,99 @@ class FakeGefei:
                                "global_rank": 1000 * page, "category": "AI image", "traffic": [], "page_url": "p"}]}
         tool = path.rsplit("/", 1)[1]
         return self.query.get(tool)
+
+
+class FakeLark:
+    """lark-cli: the read-only preflight commands plus docs +create / +update."""
+
+    def __init__(self):
+        self.calls: list[list[str]] = []
+        self.logged_in = True
+        self.nodes = {"wikiDaily": "Daily reports", "wikiOpp": "Opportunities"}
+        self.editable = {"wikiDaily", "wikiOpp"}
+        self.fail = False  # publishing (create / update) fails
+        self.installed = True
+        self.created = 0
+
+    def __call__(self, args, cwd):
+        if not self.installed:
+            raise FileNotFoundError(2, "No such file or directory", args[0])
+        self.calls.append(args)
+        sub = args[1:3]
+        if args[1] == "--version":
+            return 0, "lark-cli version 1.0.77\n", ""
+        if sub == ["auth", "status"]:
+            user = {"status": "ready", "available": True, "verified": True} if self.logged_in else \
+                {"status": "missing", "available": False, "message": "User identity: missing"}
+            return 0, json.dumps({"identities": {"user": user, "bot": {"status": "ready", "available": True}},
+                                  "identity": "user"}), ""
+        if sub == ["wiki", "+node-get"]:
+            tok = args[args.index("--node-token") + 1]
+            if tok not in self.nodes:
+                return 0, json.dumps({"ok": False, "error": {"type": "api", "code": 131005, "message": "not found"}}), ""
+            return 0, json.dumps({"ok": True, "data": {"node": {"node_token": tok, "title": self.nodes[tok]}}}), ""
+        if sub == ["drive", "permission.members"]:
+            tok = args[args.index("--token") + 1]
+            return 0, json.dumps({"ok": True, "data": {"auth_result": tok in self.editable}}), ""
+        if "--help" in args:
+            return 0, "--parent-token --doc-format --content --doc --command overwrite", ""
+        content = args[args.index("--content") + 1]
+        assert content.startswith("@") and (cwd / content[1:]).is_file()
+        if self.fail:
+            return 1, "", "permission denied"
+        if "+create" in args:
+            self.created += 1
+            doc = f"doc{self.created}"
+            self.editable.add(doc)
+            return 0, json.dumps({"ok": True, "data": {"document": {"document_id": doc,
+                                                                    "url": f"https://x.feishu.cn/docx/{doc}"}}}), ""
+        return 0, json.dumps({"ok": True, "data": {"document": {"revision_id": 2}}}), ""
+
+    @property
+    def publishes(self) -> list[list[str]]:
+        return [a for a in self.calls if a[1] == "docs" and a[2] in ("+create", "+update") and "--help" not in a]
+
+
+def which(name: str) -> str:
+    return f"/usr/local/bin/{name}"
+
+
+def browser_report(day: date = DAY1, **failed) -> dict:
+    """The agent's preflight.browser.json with every check passing; name=dict(...) overrides one check."""
+    from radar.preflight import BROWSER_CHECKS, watchlist_urls
+    from radar.config import TZ
+    urls = {"Browser connection": ["about:blank"], "Public web": ["https://en.wikipedia.org/wiki/Meme"],
+            "TikTok": ["https://www.tiktok.com/tag/aibaby"], "CapCut": ["https://www.capcut.com/templates"],
+            "Instagram": ["https://www.instagram.com/explore/tags/aibaby/"],
+            "X": ["https://x.com/search?q=ai%20baby"], "YouTube": ["https://www.youtube.com/results?search_query=x"],
+            "Reddit": ["https://www.reddit.com/r/aivideo/new/"],
+            "Creative Center": ["https://ads.tiktok.com/business/creativecenter/inspiration/popular/hashtag/pc/en"],
+            "Watchlist": [v[0] for v in watchlist_urls().values()]}
+    checks = []
+    for n in BROWSER_CHECKS:
+        c = {"name": n, "status": "pass", "access": "logged_in" if n in ("TikTok", "Instagram", "X") else "not_needed",
+             "urls": urls[n], "result": f"{n} research page loaded with content"}
+        c.update(failed.get(n.replace(" ", "_"), {}))
+        checks.append(c)
+    return {"day": day.isoformat(), "checked_at": datetime.combine(day, time(8), TZ).isoformat(),
+            "browser": "Claude in Chrome", "checks": checks}
+
+
+def ready(paths: Paths, day: date = DAY1, **failed) -> Path:
+    """Write the agent's browser preflight report for `day`."""
+    return write(paths.work(day) / "preflight.browser.json", browser_report(day, **failed))
+
+
+def make_ctx(paths, conn, settings, fake, lk, day: date = DAY1, browser: bool = True, **kw):
+    """A pipeline context living on `day`, with Lark configured and (by default) a passing browser report."""
+    from radar import pipeline
+    from radar.config import LarkSettings
+    advance(day)
+    settings.lark = LarkSettings(daily_parent="wikiDaily", opportunity_parent="wikiOpp")
+    if browser:
+        ready(paths, day)
+    return pipeline.Context(day=day, settings=settings, paths=paths, conn=conn, transport=fake, lark_runner=lk,
+                            which=kw.pop("which", which), say=kw.pop("say", lambda s: None), **kw)
 
 
 class Clock:
