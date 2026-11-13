@@ -1,10 +1,10 @@
 # Daily runbook
 
-Every weekday at 08:30 Asia/Shanghai (cron `30 8 * * 1-5`, ±15 min). Delivery any time in the morning is fine: accuracy over speed. The report is in Chinese and answers one question: **which meme is worth an AI template today.** Words in bold below are defined in `GLOSSARY.md`.
+Every day at 08:30 Asia/Hong_Kong (cron `30 8 * * *`, ±15 min). Delivery any time in the morning is fine: accuracy over speed. The report is in Chinese and answers one question: **which meme is worth an AI template today.** Words in bold below are defined in `GLOSSARY.md`.
 
 The scheduled Grok Bot job runs this Git checkout and its `radar` commands. Log the Git commit and start and finish times for CC lists, CC details, watchlist, heat and remixes, judgments, build, chat delivery, Git push, Wiki import and Base sync. Record interrupted stages and their last completed work so a retry can resume from the saved raw snapshots.
 
-Window: the last 24–48h (Monday covers the weekend). Platforms: TikTok first, then CapCut templates, then Instagram Reels. X, YouTube Shorts and Reddit are supporting sources. Never Douyin.
+Window: the last 24–48h. Platforms: TikTok first, then CapCut templates, then Instagram Reels. X, YouTube Shorts and Reddit are supporting sources. Never Douyin.
 
 ## 0. Prepare
 

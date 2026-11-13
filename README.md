@@ -1,6 +1,6 @@
 # AI 视频梗雷达
 
-每个工作日早上回答一个问题：海外短视频里，今天哪个 AI 视频梗值得做成模板。平台顺序是 TikTok、CapCut 模板、Instagram Reels，X、YouTube Shorts、Reddit 作辅证，不看抖音。
+每天早上回答一个问题：海外短视频里，今天哪个 AI 视频梗值得做成模板。平台顺序是 TikTok、CapCut 模板、Instagram Reels，X、YouTube Shorts、Reddit 作辅证，不看抖音。
 
 ## 快速开始
 
