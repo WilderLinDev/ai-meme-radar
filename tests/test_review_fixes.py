@@ -246,11 +246,10 @@ def toml(dirpath, text):
 
 def test_settings_env_toml_precedence_and_defaults(tmp_path):
     cfg = tmp_path / "cfg"
-    toml(cfg, '[gefei]\ntoken = "wc_mcp_fromtoml"\nmin_credits = 80\n[lark]\ndaily_parent = "node"\n'
+    toml(cfg, '[gefei]\ntoken = "wc_mcp_fromtoml"\n[lark]\ndaily_parent = "node"\n'
               '[paths]\ndata_dir = "/toml/data"\nreports_dir = "/toml/reports"\n')
     s = load_settings(env={"AMR_CONFIG_DIR": str(cfg)})                       # custom config dir + TOML fallback
     assert s.token == "wc_mcp_fromtoml" and s.token_from == "toml" and s.lark.daily_parent == "node"
-    assert s.gefei.min_credits == 80
     assert Paths.resolve(s).db.as_posix() == "/toml/data/radar.db"
     assert Paths.resolve(s).daily_report(DAY1).as_posix() == "/toml/reports/daily/2026-11-13.md"
 
@@ -261,7 +260,7 @@ def test_settings_env_toml_precedence_and_defaults(tmp_path):
     assert Paths.resolve(s).reports.as_posix() == "/env/reports"
 
     s = load_settings(env={"AMR_CONFIG_DIR": str(tmp_path / "none")})         # no file: safe defaults
-    assert s.source is None and s.token == "" and not s.lark.daily_parent and s.gefei.min_credits == 50
+    assert s.source is None and s.token == "" and not s.lark.daily_parent
     assert Paths.resolve(s).root.name == "ai-meme-radar-data"
     s = load_settings(env={"AMR_CONFIG_DIR": str(tmp_path / "none"), "GEFEI_API_TOKEN": "wc_mcp_e"})
     assert s.token == "wc_mcp_e"                                               # env alone is enough

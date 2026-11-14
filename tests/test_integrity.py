@@ -203,8 +203,8 @@ def test_rebuilding_an_old_report_ignores_later_information(conn, paths):
 
 # ---- 5. social coverage ----
 def test_social_coverage_is_required_and_reported(conn, paths):
-    doc = research_doc(social_coverage=[c for c in coverage() if c["platform"] != "Reddit"])
-    with pytest.raises(InputError, match="missing \\['Reddit'\\]"):
+    doc = research_doc(social_coverage=[c for c in coverage() if c["platform"] != "YouTube"])
+    with pytest.raises(InputError, match="missing \\['YouTube'\\]"):
         ingest(conn, paths, doc)
     bad = coverage(Instagram=("failed", ""))
     with pytest.raises(InputError, match="needs a reason"):
@@ -219,7 +219,7 @@ def test_social_coverage_is_required_and_reported(conn, paths):
                                              {"day": DAY1.isoformat(), "assessments": []}), DAY1)
     daily.build(conn, DAY1, paths)
     text = paths.daily_report(DAY1).read_text(encoding="utf-8")
-    assert "> 社交调研覆盖：6/8 个来源完成；未完成：Instagram（失败）、X（未进行）。" in text
+    assert "> 社交调研覆盖：5/7 个来源完成；未完成：Instagram（失败）、X（未进行）。" in text
     assert "| Instagram | 失败 | — | 未知 | login wall |" in text
     assert "调研备注：CapCut template pages were slow" in text
     assert "- 社交调研：X：not_attempted：out of time" in text  # also a gap

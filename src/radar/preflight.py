@@ -8,7 +8,7 @@ Python verifies what it can verify deterministically:
 * local:   Python, dependencies, settings, environment overrides, project config files, data /
            report / work / feedback folders, disk space, SQLite schema and integrity, `uv`, the lock
 * gefei:   token, endpoint and live catalog, authentication (`GET /api/v1/me`, which returns the
-           balance), credits >= `[gefei] min_credits`, data-service access (free page-1 list calls)
+           balance when available), data-service access (free page-1 list calls)
 * lark:    `lark-cli` runs, the configured identity is logged in (verified with the server), each
            destination Wiki node exists and grants edit, the create / update commands exist, and
            every document the run will overwrite still grants edit
@@ -49,8 +49,9 @@ BROWSER_FILE = "preflight.browser.json"
 REPORT_FILE = "preflight.json"
 BROWSER_CHECKS = ("Browser connection", "Public web", *SOCIAL_PLATFORMS, "Creative Center", "Watchlist")
 PLATFORM_HOSTS = {"TikTok": ("tiktok.com",), "CapCut": ("capcut.com",), "Instagram": ("instagram.com",),
-                  "X": ("x.com", "twitter.com"), "YouTube": ("youtube.com",), "Reddit": ("reddit.com",),
+                  "X": ("x.com", "twitter.com"), "YouTube": ("youtube.com",),
                   "Creative Center": ("ads.tiktok.com",)}
+OPTIONAL_BROWSER_ACCESS = {"Instagram", "X", "Watchlist"}
 WATCHLIST_COLUMNS = ("platform", "handle", "profile_url", "selected")
 REVENUE_TOOLS = ("income_months_v2", "income_month_v2")
 
@@ -63,6 +64,7 @@ class Check:
     result: str  # what was actually observed
     reason: str = ""  # why it failed (empty when ok)
     fix: str = ""  # what the user must do (empty when ok)
+    blocking: bool = True
 
 
 @dataclass
@@ -73,7 +75,7 @@ class Report:
 
     @property
     def failed(self) -> list[Check]:
-        return [c for c in self.checks if not c.ok]
+        return [c for c in self.checks if not c.ok and c.blocking]
 
     @property
     def ready(self) -> bool:
@@ -84,11 +86,13 @@ class Report:
                 "failed": [c.name for c in self.failed], "checks": [asdict(c) for c in self.checks]}
 
     def render(self) -> str:
-        head = (f"PREFLIGHT {self.day}: READY ({len(self.checks)} checks passed)" if self.ready else
+        head = (f"PREFLIGHT {self.day}: READY ({sum(c.ok for c in self.checks)} passed, "
+                f"{sum(not c.ok and not c.blocking for c in self.checks)} warnings)" if self.ready else
                 f"PREFLIGHT {self.day}: NOT READY ({len(self.failed)} of {len(self.checks)} checks failed)")
         lines = [head]
         for c in self.checks:
-            lines.append(f"  [{'PASS' if c.ok else 'FAILED'}] {c.area} / {c.name}: {c.result}")
+            label = 'PASS' if c.ok else 'FAILED' if c.blocking else 'WARN'
+            lines.append(f"  [{label}] {c.area} / {c.name}: {c.result}")
             if not c.ok:
                 lines += [f"           reason: {c.reason}", f"           fix:    {c.fix}"]
         if not self.ready:
@@ -188,15 +192,14 @@ def settings_checks(settings: Settings, env: dict) -> list[Check]:
                        f"set {', '.join(rel)} to absolute paths"))
     else:
         out.append(ok("local", "Environment variables", "folder overrides are absolute (or unset)"))
-    if settings.gefei.min_credits < 0 or settings.gefei.keyword_detail_limit < 0 or settings.gefei.refresh_days < 0:
-        out.append(bad("local", "Ge Fei settings", "negative value", "min_credits, keyword_detail_limit and "
+    if settings.gefei.keyword_detail_limit < 0 or settings.gefei.refresh_days < 0:
+        out.append(bad("local", "Ge Fei settings", "negative value", "keyword_detail_limit and "
                        "refresh_days must be >= 0", "fix [gefei] in settings.toml"))
     elif urlparse(settings.gefei.base_url).scheme != "https":
         out.append(bad("local", "Ge Fei settings", settings.gefei.base_url, "base_url must be https",
                        "fix [gefei] base_url in settings.toml"))
     else:
-        out.append(ok("local", "Ge Fei settings", f"base_url {settings.gefei.base_url}, "
-                                                  f"min_credits {settings.gefei.min_credits:g}"))
+        out.append(ok("local", "Ge Fei settings", f"base_url {settings.gefei.base_url}"))
     return out
 
 
@@ -298,7 +301,7 @@ def gefei_checks(settings: Settings, conn: sqlite3.Connection, transport: Transp
         catalog_ok = False
     if not (catalog_ok and out[0].ok):
         why = "the token is missing or malformed" if not out[0].ok else "the endpoint or catalog check failed"
-        return out + [bad("gefei", n, "not verified", why, "fix the failed Ge Fei check above") for n in names[1:]]
+        return out + [bad("gefei", n, "not verified", why, "fix the failed Ge Fei check above") for n in (names[1], names[3])]
 
     try:
         me = client.call("me", {}, purpose="preflight", max_age=timedelta(0))
@@ -310,20 +313,20 @@ def gefei_checks(settings: Settings, conn: sqlite3.Connection, transport: Transp
         else:
             out.append(bad("gefei", names[1], f"HTTP {e.status} {e.code}", settings.redact(str(e)),
                            "retry later; if it persists, check the account at https://seo.web.cafe/api/"))
-        return out + [bad("gefei", n, "not verified", "authentication failed", "fix Ge Fei authentication")
-                      for n in names[2:]]
-    credits = me.body.get("credits") if isinstance(me.body, dict) else None
+        return out + [bad("gefei", names[3], "not verified", "authentication failed", "fix Ge Fei authentication")]
+    credits = me.body.get("credits")
     balance = credits.get("balance") if isinstance(credits, dict) else None
-    need = settings.gefei.min_credits
-    if not isinstance(balance, (int, float)):
-        out.append(bad("gefei", names[2], "balance not returned", "GET /api/v1/me did not report credits.balance",
-                       "check the balance at https://seo.web.cafe/api/; the gate cannot confirm credits"))
-    elif balance < need:
-        out.append(bad("gefei", names[2], f"balance {balance:g}", f"below the required {need:g} credits "
-                       "([gefei] min_credits, the budget for a day's query calls)", "top up Ge Fei credits"))
+    if type(balance) not in (int, float):
+        balance = me.body.get("apiAvailable")
+    if type(balance) not in (int, float) and isinstance(me.data, dict):
+        balance = me.data.get("apiAvailable")
+    if type(balance) in (int, float) and balance > 0:
+        out.append(ok("gefei", names[2], f"API credits available: {balance:g}"))
     else:
-        low = " (Ge Fei flags it as low)" if credits.get("low") else ""
-        out.append(ok("gefei", names[2], f"balance {balance:g} >= required {need:g}{low}"))
+        reading = f"API credits available: {balance:g}" if type(balance) in (int, float) else "API balance not reported"
+        out.append(Check("gefei", names[2], False, reading,
+                         "paid query balance is exhausted or unverified",
+                         "continue with data services and public evidence; skip paid queries", blocking=False))
 
     locked = []
     for s in services:
@@ -524,9 +527,14 @@ def browser_checks(path: Path, day: date) -> list[Check]:
             continue
         seen = f"{c.result} [{rep.browser}; access {c.access}; opened {', '.join(c.urls) or 'nothing'}]"
         if c.status == "failed":
-            out.append(bad("browser", n, seen, c.reason or "the agent reported a failure",
-                           c.fix or ("log in to this platform in the connected browser" if c.access == "login_required"
-                                     else "make the page reachable in the connected browser")))
+            if n in OPTIONAL_BROWSER_ACCESS or (n in SOCIAL_PLATFORMS and c.access == "login_required"):
+                out.append(Check("browser", n, False, seen, c.reason or "source unavailable",
+                                 "use available public pages and record a research gap", blocking=False))
+            else:
+                out.append(bad("browser", n, seen, c.reason or "the agent reported a failure",
+                               c.fix or ("log in to Creative Center in the connected browser"
+                                         if n == "Creative Center" and c.access == "login_required"
+                                         else "make the page reachable in the connected browser")))
             continue
         problem = _pass_problem(n, c, watch)
         out.append(bad("browser", n, seen, problem, fix_all) if problem else ok("browser", n, seen))

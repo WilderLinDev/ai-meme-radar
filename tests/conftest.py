@@ -204,7 +204,6 @@ def browser_report(day: date = DAY1, **failed) -> dict:
             "TikTok": ["https://www.tiktok.com/tag/aibaby"], "CapCut": ["https://www.capcut.com/templates"],
             "Instagram": ["https://www.instagram.com/explore/tags/aibaby/"],
             "X": ["https://x.com/search?q=ai%20baby"], "YouTube": ["https://www.youtube.com/results?search_query=x"],
-            "Reddit": ["https://www.reddit.com/r/aivideo/new/"],
             "Creative Center": ["https://ads.tiktok.com/business/creativecenter/inspiration/popular/hashtag/pc/en"],
             "Watchlist": [v[0] for v in watchlist_urls().values()]}
     checks = []

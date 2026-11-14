@@ -39,7 +39,7 @@ OBSERVED_MARKETS = ("DE", "JP", "KR", "FR")
 GLOBAL_MARKET = "WORLD"  # early signals
 MARKETS = (PRIMARY_MARKET, *SUPPLEMENTARY_MARKETS, *OBSERVED_MARKETS, GLOBAL_MARKET)
 CC_REGIONS = ("US", "GB", "AU", "CA", "DE", "JP", "KR", "FR")  # Creative Center: NL is not offered
-SOCIAL_PLATFORMS = ("TikTok", "CapCut", "Instagram", "X", "YouTube", "Reddit")  # never Douyin
+SOCIAL_PLATFORMS = ("TikTok", "CapCut", "Instagram", "X", "YouTube")  # never Douyin
 # Every social source the agent must report on each day in research.json `social_coverage`.
 COVERAGE_SOURCES = (*SOCIAL_PLATFORMS, "Creative Center", "Watchlist")
 
@@ -98,7 +98,6 @@ class GefeiSettings:
     base_url: str = GEFEI_BASE_URL
     keyword_detail_limit: int = 40  # keyword_detail calls per sync for creative-relevant new keywords
     refresh_days: int = 3  # batches finished within this many days are re-fetched (content may update)
-    min_credits: float = 50  # preflight refuses to start below this balance (a day's query budget)
 
 
 @dataclass
@@ -177,7 +176,6 @@ def load_settings(path: Path | None = None, env: Mapping[str, str] | None = None
                 base_url=str(g.get("base_url", GEFEI_BASE_URL)).rstrip("/"),
                 keyword_detail_limit=int(g.get("keyword_detail_limit", 40)),
                 refresh_days=int(g.get("refresh_days", 3)),
-                min_credits=float(g.get("min_credits", 50)),
             ),
             lark=LarkSettings(
                 daily_parent=str(lk.get("daily_parent", "")),

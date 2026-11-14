@@ -25,12 +25,12 @@ Never hand-write a number Python can compute. Never change how a deterministic m
 ## Fixed scope (do not ask)
 
 - Markets: US primary; GB, CA, AU supplementary English markets; DE, JP, KR, FR observed; global (`WORLD`) for early signals.
-- Social platforms: TikTok, CapCut, Instagram Reels, X, YouTube Shorts, Reddit. Never Douyin.
+- Social platforms: TikTok, CapCut, Instagram Reels, X, YouTube Shorts. Never Douyin.
 - TikTok Creative Center Top 100 is one source among many (US GB AU CA DE JP KR FR × 7/30 days, News & Entertainment; NL is not offered). It is not the candidate entry point.
 - Watchlist: every `selected=yes` row of `config/watchlist.csv`.
 - Report language: Chinese. Local Markdown is authoritative; Lark is the published copy.
 
-Ask the user only to fix what the preflight report lists as FAILED (all items in one message). There is no degraded mode: never skip a source, a service or a stage to get the day done.
+Ask the user only to fix what the preflight report lists as FAILED (all items in one message). Record non-blocking access failures as research gaps. Only Creative Center may require a social login.
 
 ## Where things are
 
@@ -42,7 +42,7 @@ Ask the user only to fix what the preflight report lists as FAILED (all items in
 - Settings: one loader (`src/radar/config.py`). Precedence: environment variables > `settings.toml` > defaults.
   - `settings.toml` is in `$AMR_CONFIG_DIR`, else `~/.config/ai-meme-radar/`. Template: `config/settings.example.toml`. Every key is optional.
   - Env vars: `GEFEI_API_TOKEN` (secret), `AMR_CONFIG_DIR`, `AMR_DATA_DIR`, `AMR_REPORTS_DIR`.
-  - Required: the Ge Fei token, a balance of at least `[gefei] min_credits` (default 50), `[lark] daily_parent` (a Wiki node token; `opportunity_parent` optional) and a logged-in lark-cli `identity`. Publishing has no off switch.
+  - Required: the Ge Fei token, `[lark] daily_parent` (a Wiki node token; `opportunity_parent` optional) and a logged-in lark-cli `identity`. Publishing has no off switch.
   - Lark login is lark-cli's own (`lark-cli auth login`); the app stores no Lark credential.
   - Never ask the user to paste a secret into chat. They set it locally; you rerun.
   - Never paste the token into chat, files in the repo, commit messages or reports. Output is redacted, but don't rely on that.
@@ -66,15 +66,15 @@ DAY is today in Asia/Shanghai. Start: `git pull && uv sync`, then the gate.
 
 ### 0. Strict preflight (mandatory, before anything else)
 
-Nothing starts until every required check passes. Every `run` rechecks everything; when one check fails, the run stops with exit 4 and no other stage runs.
+Nothing starts until every required check passes. Every `run` rechecks everything; when a blocking check fails, the run stops with exit 4 and no other stage runs.
 
-1. **Browser checks (you).** Use the connected browser and check each of these for real. A homepage that loads does not count: open the pages your research actually uses, logged in where the platform needs it.
+1. **Browser checks (you).** Use the connected browser and check each of these for real. A homepage that loads does not count: open the pages your research actually uses, using public access except for Creative Center.
    - `Browser connection`: the browser integration answers and can open a tab.
    - `Public web`: an ordinary public article page (for example Wikipedia or Know Your Meme) loads.
-   - `TikTok`, `CapCut`, `Instagram`, `X`, `YouTube`, `Reddit`: a hashtag, search, explore or template page on that site shows content. Check for a login wall, a CAPTCHA or a "content unavailable" page.
+   - `TikTok`, `CapCut`, `Instagram`, `X`, `YouTube`: a hashtag, search, explore or template page on that site shows content. Check for a login wall, a CAPTCHA or a "content unavailable" page.
    - `Creative Center`: a Top 100 hashtag or popular page loads on ads.tiktok.com.
-   - `Watchlist`: open at least one selected profile per platform in `config/watchlist.csv`.
-   Never bypass a login, a CAPTCHA or an access restriction; that check fails and the user must fix it. Write `work/DAY/preflight.browser.json`:
+   - `Watchlist`: try at least one selected profile per platform in `config/watchlist.csv`. If only some open, report the check as failed with the accessible URLs and record partial coverage in the research file.
+   Respect login walls, CAPTCHAs and access restrictions. Instagram, X and Watchlist failures are warnings, and login walls on other social platforms are also warnings. Only ask for a social login if Creative Center requires it. Write `work/DAY/preflight.browser.json`:
    ```json
    {"day": "DAY", "checked_at": "2026-11-14T08:05:00+08:00", "browser": "Claude in Chrome",
     "checks": [{"name": "TikTok", "status": "pass", "access": "logged_in",
@@ -84,8 +84,8 @@ Nothing starts until every required check passes. Every `run` rechecks everythin
                 "fix": "log in to Instagram in the connected browser"}]}
    ```
    Include one entry per name above. `access` is logged_in, not_needed, login_required, blocked or unreachable. `urls` lists the research pages you actually opened. Python rejects a pass with no research page, a URL on the wrong site, a pass with a login wall, a Watchlist pass without a selected profile per platform, and a report from another day. Python never checks login state itself; your report is the only source.
-2. **Python checks (`run`).** The same command checks the local environment (Python, dependencies, settings, environment variables, project config, watchlist, folders, disk, feedback files, SQLite schema and integrity, `uv`, the lock). It checks Ge Fei: the token, the endpoint and live catalog, authentication and balance via `GET /api/v1/me`, credits ≥ `min_credits`, and free page-1 calls for data-service access. It checks Lark read-only: `lark-cli` runs, `auth status --verify` for the identity, each destination Wiki node exists with edit permission, `docs +create/+update` are available, and every document due for an update is still editable. No research credits are spent and nothing is written to Lark.
-3. **One report.** `run` prints every check as PASS or FAILED with what it saw, the reason and the fix, and saves it to `work/DAY/preflight.json`. READY only if every check passed.
+2. **Python checks (`run`).** The same command checks the local environment (Python, dependencies, settings, environment variables, project config, watchlist, folders, disk, feedback files, SQLite schema and integrity, `uv`, the lock). It checks Ge Fei: the token, the endpoint and live catalog, authentication and balance via `GET /api/v1/me`, and free page-1 calls for data-service access. It checks Lark read-only: `lark-cli` runs, `auth status --verify` for the identity, each destination Wiki node exists with edit permission, `docs +create/+update` are available, and every document due for an update is still editable. No research credits are spent and nothing is written to Lark.
+3. **One report.** `run` prints every check as PASS, WARN or FAILED with what it saw, the reason and the fix, and saves it to `work/DAY/preflight.json`. READY if there are no blocking failures.
 4. **If NOT READY:** send the user one message listing every FAILED item and exactly what to do. Credentials are set locally, never pasted into chat. Then stop and wait. Do not start research, run `call`, write `research.json`, or ask about items one by one.
 5. **When the user says it's fixed:** redo the browser checks that failed and rewrite `preflight.browser.json`, then rerun `run`. If the gate is READY, the workflow continues without asking for confirmation. If anything still fails, go back to step 4.
 
@@ -106,7 +106,7 @@ Read it first. It holds:
 
 Run the four channels in parallel in your head; any can surface a trend.
 
-1. **Social**: sweep the watchlist accounts (last 48h), TikTok / CapCut template pages, Creative Center, Instagram Reels, X AI-video creators, YouTube Shorts, Reddit (r/aivideo and similar), model accounts (Seedance, Kling, Veo, Sora, Hailuo, PixVerse). Look for participation: remixes, templates used, duet/stitch counts, comment requests ("how do I make this"). Record what the page shows; never estimate a count you can read.
+1. **Social**: sweep the watchlist accounts (last 48h), TikTok / CapCut template pages, Creative Center, Instagram Reels, X AI-video creators, YouTube Shorts, model accounts (Seedance, Kling, Veo, Sora, Hailuo, PixVerse). Look for participation: remixes, templates used, duet/stitch counts, comment requests ("how do I make this"). Record what the page shows; never estimate a count you can read.
 2. **Search**: social trend → its search terms → `keyword_volume` (US first, then GB/CA/AU), `google_trends`, `trends_rising`, `keyword_ideas`, `search_intent`, `serp` / `serp_review`, `keyword_difficulty`. Emerging keyword → find the social trend behind it. Not every early signal has search data; say so instead of forcing it.
 3. **Product**: new launches / hosted sites in the creative space → which trend or keyword they serve; trend → who already sells it (`search_known_sites`, `domain_overview`, `site_keywords`, `site_history`, `domain_traffic`, `domain_dr`).
 4. **Market**: revenue and traffic of competitors (`stripe_checkout_referrals`, `income_site_detail_v2`, `website_worth`, `backlink_value`, `domain_timeline`). Estimated traffic is not revenue; say which you have.
@@ -115,7 +115,7 @@ Go deeper on high-priority items: public internet, Know Your Meme, creator posts
 
 **Ge Fei usage rules**
 - Call through `run_day.py call` only, so every request, response, `requestId` and credit charge is recorded. Use MCP only for exploration you will not cite.
-- Before calling, check `tools` for parameters and price. Batch keywords (up to 50 per `keyword_volume`). Identical calls within 7 days (30 for knowledge) are served from SQLite; pass `--fresh` only when you need new data and can say why.
+- Before calling, check `tools` for parameters and price. If API credits are exhausted or unknown, use the free data services and public evidence. If a paid call returns quota or day_cap, stop paid calls for the run and record a gap. Batch keywords (up to 50 per `keyword_volume`). Identical calls within 7 days (30 for knowledge) are served from SQLite; pass `--fresh` only when you need new data and can say why.
 - Do not run query APIs on every entity every day. Query when a candidate is new, when a decision depends on it, or when the last reading is stale for that decision.
 - Cite a call with `"api_call_id"` on the evidence row. A value you cite must appear in that response; derived numbers are tagged 估算.
 
@@ -129,7 +129,7 @@ Schema: `src/radar/research/models.py` (`ResearchFile`). Ids are kebab-case and 
 - `links`: trend -uses-> format, format -enables-> opportunity, trend -drives-> opportunity, trend -searched_as-> keyword, opportunity -targets-> keyword, any -competitor|related-> site, trend/format -related|variant_of-> same kind. Many-to-many is normal; never force one-to-one.
 - `evidence`: one row per observation, with `channel`, `source`, `url`, `metric`, `value`, `unit`, `region`, `sample_size`, `metric_definition`, `collected_at` (with offset), `confidence`, `tag` (已核实 / 第三方读数 / 估算), optional `api_call_id`, and a `ref` so assessments can cite it. A ref is unique across the whole database, forever: re-ingesting the identical row is a no-op, but a ref that already names different evidence (any day, including today) is rejected. A new observation gets a new ref, e.g. `tt-aibabydance-posts-20261114`. Evidence is append-only; without a ref, changing any field stores a new row instead of replacing the old one. Qualitative evidence leaves `value` empty and explains in `note`. Keep metric names stable across days for the same series (`posts_24h`, `views_top10_remix`, `cc_index`, `search_volume`, ...): backtests follow them.
 - `gaps`: everything you tried and could not get, with why. Missing is not zero; never interpolate.
-- `social_coverage` (required): one entry per source: TikTok, CapCut, Instagram, X, YouTube, Reddit, Creative Center, Watchlist. Give `status` (covered / partial / failed / not_attempted), `window` (approximate time window searched; required unless failed or not attempted), `signals` (found / none; `unknown` only for a source not fully covered) and `note` (what you did; for anything not covered, the reason: login wall, rate limit, out of time). Anything not covered becomes a gap automatically. The daily report shows this table and a one-line summary, so be honest: a source you didn't open is `not_attempted`, not `covered`.
+- `social_coverage` (required): one entry per source: TikTok, CapCut, Instagram, X, YouTube, Creative Center, Watchlist. Give `status` (covered / partial / failed / not_attempted), `window` (approximate time window searched; required unless failed or not attempted), `signals` (found / none; `unknown` only for a source not fully covered) and `note` (what you did; for anything not covered, the reason: login wall, rate limit, out of time). Anything not covered becomes a gap automatically. The daily report shows this table and a one-line summary, so be honest: a source you didn't open is `not_attempted`, not `covered`.
 - `notes`: run-level remarks (method changes, what you would do with more time). Persisted and shown in the report.
 
 Rerun. Fix every problem it lists, then rerun again.

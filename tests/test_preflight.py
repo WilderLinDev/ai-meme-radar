@@ -68,7 +68,7 @@ def test_missing_gefei_token(paths, conn, settings, fake):
     f = failed(report)
     assert "GEFEI_API_TOKEN" in f["Ge Fei token"]["fix"]
     assert f["Ge Fei authentication"]["result"] == "not verified"  # dependent checks are failed, not skipped
-    assert "Ge Fei credits" in f and "Ge Fei data services" in f
+    assert "Ge Fei data services" in f and "Ge Fei credits" not in f
     assert_blocked(conn, fake, code)
 
 
@@ -86,24 +86,17 @@ def test_gefei_connectivity_failure(paths, conn, settings, fake):
     code, report, said = gate(paths, conn, settings, fake)
     f = failed(report)
     assert "unreachable" in f["Ge Fei endpoint and catalog"]["reason"]
-    assert {"Ge Fei authentication", "Ge Fei credits", "Ge Fei data services"} <= set(f)
+    assert {"Ge Fei authentication", "Ge Fei data services"} <= set(f)
     assert_blocked(conn, fake, code)
 
 
-def test_insufficient_credits(paths, conn, settings, fake):
-    fake.balance = 12
-    settings.gefei.min_credits = 50
+@pytest.mark.parametrize("balance", [0, None])
+def test_credits_do_not_block_free_work(paths, conn, settings, fake, balance):
+    fake.balance = balance
     code, report, _ = gate(paths, conn, settings, fake)
-    assert set(failed(report)) == {"Ge Fei credits"}
-    assert "balance 12" in failed(report)["Ge Fei credits"]["result"]
-    assert_blocked(conn, fake, code)
-
-
-def test_unreported_balance_is_unverified_not_passed(paths, conn, settings, fake):
-    fake.balance = None
-    code, report, _ = gate(paths, conn, settings, fake)
-    assert set(failed(report)) == {"Ge Fei credits"}
-    assert_blocked(conn, fake, code)
+    assert code == pipeline.WAITING and report["ready"]
+    credit = next(c for c in report["checks"] if c["name"] == "Ge Fei credits")
+    assert not credit["ok"] and not credit["blocking"]
 
 
 def test_locked_data_service(paths, conn, settings, fake):
@@ -133,8 +126,7 @@ def test_browser_reported_disconnected(paths, conn, settings, fake):
     assert set(f) == {"Browser connection"} and f["Browser connection"]["fix"] == "reconnect the browser extension"
 
 
-@pytest.mark.parametrize("platform", ["TikTok", "CapCut", "Instagram", "X", "YouTube", "Reddit", "Creative Center",
-                                      "Watchlist"])
+@pytest.mark.parametrize("platform", ["TikTok", "CapCut", "YouTube", "Creative Center"])
 def test_each_required_platform_unavailable(paths, conn, settings, fake, platform):
     c = make_ctx(paths, conn, settings, fake, FakeLark(), say=lambda s: None)
     ready(paths, **{platform.replace(" ", "_"): {"status": "failed", "access": "blocked",
@@ -146,11 +138,11 @@ def test_each_required_platform_unavailable(paths, conn, settings, fake, platfor
 
 def test_required_login_missing(paths, conn, settings, fake):
     c = make_ctx(paths, conn, settings, fake, FakeLark(), say=lambda s: None)
-    ready(paths, Instagram={"status": "failed", "access": "login_required", "result": "redirected to login",
-                            "reason": "Instagram asks to log in", "fix": ""})
+    ready(paths, Creative_Center={"status": "failed", "access": "login_required", "result": "redirected to login",
+                                  "reason": "Creative Center asks to log in", "fix": ""})
     assert_blocked(conn, fake, pipeline.run(c))
     f = failed(json.loads((paths.work(DAY1) / preflight.REPORT_FILE).read_text()))
-    assert set(f) == {"Instagram"} and "log in" in f["Instagram"]["fix"]
+    assert set(f) == {"Creative Center"} and "log in" in f["Creative Center"]["fix"]
 
 
 @pytest.mark.parametrize("override,why", [
@@ -314,9 +306,10 @@ def test_recheck_after_user_fix_starts_the_workflow_by_itself(paths, conn, setti
     ready(paths, Instagram={"status": "failed", "access": "login_required", "reason": "login wall", "fix": "log in"})
     assert_blocked(conn, fake, pipeline.run(c))
 
-    # the user logs in to Lark and Instagram and tops up credits; the agent redoes the failed browser check
-    lk.logged_in, fake.balance = True, 500
-    ready(paths)
+    # Lark is fixed while credits and optional browser access remain unavailable.
+    lk.logged_in = True
+    optional = {"status": "failed", "access": "login_required", "reason": "login wall", "fix": "log in"}
+    ready(paths, Instagram=optional, X=optional, Watchlist=optional)
     assert pipeline.run(c) == pipeline.WAITING  # same command: rechecked, READY, then the workflow ran on its own
     report = json.loads((paths.work(DAY1) / preflight.REPORT_FILE).read_text())
     assert report["ready"]
@@ -342,7 +335,7 @@ def test_gate_recheck_does_not_rerun_finished_stages(paths, conn, settings, fake
 def test_no_stage_runs_when_exactly_one_check_fails(paths, conn, settings, fake):
     write(paths.work(DAY1) / "research.json", research_doc())  # even with agent input waiting, nothing ingests
     c = make_ctx(paths, conn, settings, fake, FakeLark(), say=lambda s: None)
-    ready(paths, Reddit={"status": "failed", "access": "blocked", "reason": "rate limited", "fix": "retry later"})
+    ready(paths, Creative_Center={"status": "failed", "access": "blocked", "reason": "rate limited", "fix": "retry later"})
     assert_blocked(conn, fake, pipeline.run(c))
     assert db.one(conn, "SELECT COUNT(*) n FROM entities")["n"] == 0
     assert not (paths.work(DAY1) / "candidates.json").exists()

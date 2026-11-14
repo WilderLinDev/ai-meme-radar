@@ -3,7 +3,7 @@
     preflight -> sync -> discover -> research* -> scaffold -> decide* -> backtest -> report -> publish
 
 `preflight` is a strict gate (radar.preflight): every invocation rechecks every prerequisite
-(local, Ge Fei, Lark, and the agent's browser report) and, unless all pass, stops with exit code 4
+(local, Ge Fei, Lark, and the agent's browser report) and, if a blocking check fails, stops with exit code 4
 before any other stage starts. There is no degraded mode: a failure in sync or publish fails the run.
 Stages marked * wait for an agent file in work/DAY/ (research.json, assessments.json). A run stops
 there with exit code 2 and says what to write; the next run picks up where it stopped (finished
